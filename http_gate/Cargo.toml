@@ -1,0 +1,28 @@
+[package]
+name = "http-gate"
+authors = ["mike"]
+description = "test1"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = [ "cdylib" ]
+
+[dependencies]
+anyhow = "1"
+bytes = "1"
+http = "0.2"
+spin-sdk = { path = "../../spin/sdk/rust" }
+wit-bindgen-rust = { git = "https://github.com/bytecodealliance/wit-bindgen", rev = "cb871cfa1ee460b51eb1d144b175b9aab9c50aba" }
+serde = { version = '1.0', default-features = false, features = ['derive'] }
+serde_json = { version = '1.0', default-features = false, features = ['alloc'] }
+
+[dependencies.uuid]
+version = "1.1.2"
+features = [
+    "v4",                # Lets you generate random UUIDs
+    "fast-rng",          # Use a faster (but still sufficiently random) RNG
+    "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
+]
+
+[workspace]
