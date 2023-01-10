@@ -1,14 +1,20 @@
 use typemap::TypeMap;
 
+pub struct Method {
+    Get,
+    Post,
+}
+
+
 pub struct EightFishRequest {
-    method: String,
+    method: Method,
     path: String,
     data: Option<String>,
     ext: TypeMap,
 }
 
 impl EightFishRequest {
-    pub fn new(method: String, path: String, data: Option<String>) -> EightFishRequest {
+    pub fn new(method: Method, path: String, data: Option<String>) -> EightFishRequest {
         EightFishRequest {
             method: method,
             path: path,
@@ -18,8 +24,8 @@ impl EightFishRequest {
     }
 
     /// get http method
-    pub fn method(&self) -> &String {
-        &self.method
+    pub fn method(&self) -> Method {
+        self.method
     }
 
     /// get http path

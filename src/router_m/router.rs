@@ -5,10 +5,9 @@ use app::Error;
 use app::Key;
 use app::PathParams;
 use app::Result;
-use handler::SapperHandler;
-use hyper::method::Method;
-use request::SapperRequest;
-use response::SapperResponse;
+use handler::EightFishHandler;
+use request::{Method, EightFishRequest};
+use response::EightFishResponse;
 
 use recognizer::Router as Recognizer;
 use recognizer::{Match, Params};
@@ -21,9 +20,9 @@ impl Key for PathParams {
 /// for the Iron framework.
 pub struct Router {
     // The routers, specialized by method.
-    routers: HashMap<Method, Recognizer<Arc<Box<dyn SapperHandler>>>>,
+    routers: HashMap<Method, Recognizer<Arc<Box<dyn EightFishHandler>>>>,
     // Routes that accept any method.
-    wildcard: Recognizer<Arc<Box<dyn SapperHandler>>>,
+    wildcard: Recognizer<Arc<Box<dyn EightFishHandler>>>,
 }
 
 impl Router {
@@ -38,7 +37,7 @@ impl Router {
         &mut self,
         method: Method,
         glob: S,
-        handler: Arc<Box<dyn SapperHandler>>,
+        handler: Arc<Box<dyn EightFishHandler>>,
     ) -> &mut Router
     where
         S: AsRef<str>,
@@ -54,7 +53,7 @@ impl Router {
         &self,
         method: &Method,
         path: &str,
-    ) -> Option<Match<&Arc<Box<dyn SapperHandler>>>> {
+    ) -> Option<Match<&Arc<Box<dyn EightFishHandler>>>> {
         self.routers
             .get(method)
             .and_then(|router| router.recognize(path).ok())
@@ -107,7 +106,7 @@ impl Router {
     //     )
     // }
 
-    pub fn handle_method(&self, req: &mut SapperRequest, path: &str) -> Result<SapperResponse> {
+    pub fn handle_method(&self, req: &mut EightFishRequest, path: &str) -> Result<EightFishResponse> {
         if let Some(matched) = self.recognize(req.method(), path) {
             req.ext_mut().insert::<PathParams>(matched.params);
             matched.handler.handle(req)
