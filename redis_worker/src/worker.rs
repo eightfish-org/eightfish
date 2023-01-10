@@ -29,42 +29,6 @@ pub struct Payload2 {
     reqdata: String,
 }
 
-const REDIS_URL_ENV: &str = "REDIS_URL";
-const DB_URL_ENV: &str = "DB_URL";
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Article {
-    id: String,
-    title: String,
-    content: String,
-    authorname: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ArticleHash {
-    article: Article,
-    hash: String,
-}
-
-trait IdHashPair {
-    ///
-    fn id(&self) -> String;
-
-    ///
-    fn hash(&self) -> String;
-}
-
-impl IdHashPair for ArticleHash {
-    
-    fn id(&self) -> String {
-        self.article.id.to_string()
-    }
-
-    fn hash(&self) -> String {
-        self.hash.to_string()
-    }
-}
-
 pub struct Worker {
     app: EightFishApp,    
 }
@@ -163,15 +127,6 @@ impl Worker {
 }
 
 
-
-fn calc_hash<T: Serialize>(obj: &T) -> Result<String> {
-    // I think we can use json_digest to do the deterministic hash calculating
-    // https://docs.rs/json-digest/0.0.16/json_digest/
-    let json_val= serde_json::to_value(obj).unwrap();
-    let digest = json_digest::digest_data(&json_val).unwrap();
-
-    Ok(digest)
-}
 
 fn tail_query_process<T: IdHashPair + Serialize>(redis_addr: &str, reqid: &str, modelname: &str, results: &Vec<T>) {
     // write this content to a tmp cache

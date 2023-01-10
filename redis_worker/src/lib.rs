@@ -3,18 +3,14 @@ use spin_sdk::{
     redis_component
 };
 
-//mod bizapp;
+use myapp::start as myapp_start;
 mod worker;
 
 #[redis_component]
 fn on_message(message: Bytes) -> Result<()> {
-
-    // Need optimization, we'd better to keep an Application lifetime instance
-    // let aw = worker::Worker::new();
-    // aw.mount(bizapp::App::new())?;
-    // aw.work(message);
-
-    worker::work(message)?
+    let app = myapp_start();
+    let aw = worker::Worker::mount(app)?;
+    aw.work(message)?
 
     Ok(())
 }
