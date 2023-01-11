@@ -271,3 +271,15 @@ fn inner_stuffs_on_post_result(res: &EightFishResponse) -> Result<Vec<String, St
 
     Ok(pair_list)
 }
+
+
+fn calc_hash<T: Serialize>(obj: &T) -> Result<String> {
+    // I think we can use json_digest to do the deterministic hash calculating
+    // https://docs.rs/json-digest/0.0.16/json_digest/
+    let json_val= serde_json::to_value(obj).unwrap();
+    let digest = json_digest::digest_data(&json_val).unwrap();
+
+    Ok(digest)
+}
+
+

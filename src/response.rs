@@ -3,13 +3,13 @@ pub enum Status {
     Failed,
 }
 
-pub struct EightFishResponse<T: IdHashPair + Serialize> {
+pub struct EightFishResponse<T: CalcHash + Serialize> {
     status: Status,
     info: String,
     results: Vec<T>
 }
 
-impl EightFishResponse<T> {
+impl<T: CalcHash + Serialize> EightFishResponse<T> {
     pub fn new() -> EightFishResponse<T> {
         EightFishResponse {
             status: Status::Successful,
