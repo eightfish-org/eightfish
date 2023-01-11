@@ -18,7 +18,7 @@ impl GlobalFilter for MyGlobalFilter {
 pub fn start() -> EightFishApp {
     let mut sapp = EightFishApp::new();
     sapp.add_global_filter(MyGlobalFilter)
-        .add_module(Box::new(artile::Article))
+        .add_module(Box::new(artile::ArticleModule))
 }
 
 

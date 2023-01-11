@@ -253,10 +253,14 @@ fn inner_stuffs_on_post_result(res: &EightFishResponse) -> Result<Vec<String, St
         ins_hash = obj.calc_hash();
     }
 
-    if ins_hash == "" {
+    if info_items[1] == "delete" {
         let sql_string = format!("delete {table_name}_idhash where id='{id}'");
         let _execute_results = pg::execute(&pg_addr, &sql_string, &vec![]);
         // TODO: check the pg result
+
+    } else if info_items[1] == "update" {
+        let sql_string = format!("update {table_name}_idhash set id={id}, hash={ins_hash} where id='{id}'");
+        let _execute_results = pg::execute(&pg_addr, &sql_string, &vec![]);
 
     } else {
         let sql_string = format!("insert into {table_name}_idhash values ({}, {})", id, ins_hash);

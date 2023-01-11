@@ -130,11 +130,10 @@ impl ArticleModule {
             }
         }
 
+        let id = params.get("id").unwrap();
         let title = params.get("title").unwrap();
         let content = params.get("content").unwrap();
         let authorname = params.get("authorname").unwrap();
-
-        let id = Uuid::new_v4().simple().to_string(); // uuid
 
         // construct a struct
         let article = Article {
@@ -145,7 +144,7 @@ impl ArticleModule {
         };
 
         // construct a sql statement 
-        let sql_string = format!("insert into article values ({}, {}, {}, {})", article.id, article.title, article.content, article.authorname);
+        let sql_string = format!("update article set id='{article.id}', title='{article.title}', content='{article.content}', authorname='{article.authorname}' where id='{id}'");
         let _execute_results = pg::execute(&pg_addr, &sql_string, &vec![]);
 
         let mut results: Vec<Article> = vec![];
@@ -153,7 +152,7 @@ impl ArticleModule {
 
         let response = Response::new(
             Status::Successful, 
-            "article:new".to_string(), 
+            "article:update".to_string(), 
             results);
 
         Ok(response)
@@ -199,7 +198,7 @@ impl Module for ArticleModule {
         router.get("/article/:id", Self::get_one);
         //router.get("/article/latest", Self::get_latest);
         router.post("/article/new", Self::new);
-        //router.post("/article/update", Self::update);
+        router.post("/article/update", Self::update);
         router.post("/article/delete/:id", Self::delete);
 
         Ok(())
