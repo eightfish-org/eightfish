@@ -156,8 +156,9 @@ impl Handler for EightFishApp {
 
         // pass req to router, execute matched biz handler
         let response = self.router.handle_method(&mut req, &path);
-        match response_w {
+        match response {
             Ok(res) => {
+                Ok(res)
             }
             Err(Error::NotFound) => {
             }

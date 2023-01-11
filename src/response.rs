@@ -3,7 +3,7 @@ pub enum Status {
     Failed,
 }
 
-pub struct EightResponse<T: IdHashPair + Serialize> {
+pub struct EightFishResponse<T: IdHashPair + Serialize> {
     status: Status,
     info: String,
     results: Vec<T>

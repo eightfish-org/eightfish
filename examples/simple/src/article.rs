@@ -12,34 +12,6 @@ pub struct Article {
     authorname: String,
 }
 
-/// for performance
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ArticleHash {
-    item: Article,
-    hash: String,
-}
-
-
-trait IdHashPair {
-    ///
-    fn id(&self) -> String;
-
-    ///
-    fn hash(&self) -> String;
-
-}
-
-impl IdHashPair for ArticleHash {
-    
-    fn id(&self) -> String {
-        self.item.id.to_string()
-    }
-
-    fn hash(&self) -> String {
-        self.hash.to_string()
-    }
-}
-
 fn calc_hash<T: Serialize>(obj: &T) -> Result<String> {
     // I think we can use json_digest to do the deterministic hash calculating
     // https://docs.rs/json-digest/0.0.16/json_digest/
@@ -73,18 +45,17 @@ impl ArticleModule {
 
         let article_id = params.get("id").unwrap();
         // construct a sql statement 
-        let query_string = format!("select hash, id, title, content, author from article where id='{article_id}'");
+        let query_string = format!("select id, title, content, author from article where id='{article_id}'");
         let rowset = pg::query(&pg_addr, &query_string, &vec![]).unwrap();
 
         // convert the raw vec[u8] to every rust struct filed, and convert the whole into a
         // rust struct vec, later we may find a gerneral type converter way
-        let mut results: Vec<ArticleHash> = vec![];
+        let mut results: Vec<Article> = vec![];
         for row in rowset.rows {
-            let id = String::decode(&row[1])?;
-            let title = String::decode(&row[2])?;
-            let content = String::decode(&row[3])?;
-            let authorname = String::decode(&row[4])?;
-            let hash = String::decode(&row[0])?;
+            let id = String::decode(&row[0])?;
+            let title = String::decode(&row[1])?;
+            let content = String::decode(&row[2])?;
+            let authorname = String::decode(&row[3])?;
 
             let article = Article {
                 id,
@@ -93,25 +64,12 @@ impl ArticleModule {
                 authorname,
             };
 
-            // MUST check the article obj and the hash value equlity get from db
-            let checked_hash = calc_hash(&article).unwrap();
-            //let checked_hash = article.calc_hash().unwrap();
-            if checked_hash != hash {
-                return Err(anyhow!("Hash mismatching.".to_string()))
-            }
-
-            let article_hash = ArticleHash {
-                article,
-                hash,
-            };
-
-            println!("article_hash: {:#?}", article_hash);
-            results.push(article_hash);
+            results.push(article);
         }
 
         let response = Response::new(
             Status::Successful, 
-            "article".to_string(), 
+            "article:get_one".to_string(), 
             results);
 
         Ok(response)
@@ -149,15 +107,17 @@ impl ArticleModule {
             authorname: authorname.clone(),
         };
 
-        // should ensure the serialization way is determined.
-        // and the field hash won't participate the serialization
-        let hash = calc_hash(&article).unwrap();
-
         // construct a sql statement 
-        let sql_string = format!("insert into article values ({}, {}, {}, {}, {})", &hash, article.id, article.title, article.content, article.authorname);
+        let sql_string = format!("insert into article values ({}, {}, {}, {})", article.id, article.title, article.content, article.authorname);
         let _execute_results = pg::execute(&pg_addr, &sql_string, &vec![]);
 
-        tail_post_process(&redis_addr, reqid, "Article", &id, &hash);
+        let mut results: Vec<Article> = vec![];
+        results.push(article);
+
+        let response = Response::new(
+            Status::Successful, 
+            "article:new".to_string(), 
+            results);
 
         Ok(response)
     }
@@ -184,8 +144,14 @@ impl ArticleModule {
         // construct a sql statement 
         let sql_string = format!("delete article where id='{id}'");
         let _execute_results = pg::execute(&pg_addr, &sql_string, &vec![]);
+        // TODO check the pg result
 
-        tail_post_process(&redis_addr, reqid, "Article", &id, "");
+        let results: Vec<Article> = vec![];
+
+        let response = Response::new(
+            Status::Successful, 
+            "article:delete:{id}".to_string(), 
+            results);
 
         Ok(response)
     }
