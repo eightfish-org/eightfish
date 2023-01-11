@@ -4,7 +4,7 @@ use eightfish::{Module, Request, Response, Result as EightFishResult, Router};
 const REDIS_URL_ENV: &str = "REDIS_URL";
 const DB_URL_ENV: &str = "DB_URL";
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, CalcHash)]
 pub struct Article {
     id: String,
     title: String,
@@ -12,11 +12,13 @@ pub struct Article {
     authorname: String,
 }
 
+/// for performance
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArticleHash {
     item: Article,
     hash: String,
 }
+
 
 trait IdHashPair {
     ///

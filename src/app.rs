@@ -5,30 +5,16 @@ use std::path::Path;
 use std::str;
 use std::sync::Arc;
 
-use hyper::server::{Handler, Request, Response, Server};
-use hyper::status::StatusCode;
-use mime_types::Types as MimeTypes;
-
-pub use handler::SapperHandler;
-pub use hyper::client::Client;
-pub use hyper::header;
-pub use hyper::header::Headers;
-pub use hyper::mime;
-pub use request::SapperRequest;
-pub use response::SapperResponse;
-pub use router::SapperRouter;
+pub use handler::EightFishHandler;
+pub use request::EightFishRequest;
+pub use response::EightFishResponse;
+pub use router::EightFishRouter;
 pub use router_m::Router;
 pub use typemap::Key;
 
 /// Path parameter type
 #[derive(Clone)]
 pub struct PathParams;
-
-/// Re-export Status Codes
-pub mod status {
-    pub use hyper::status::StatusCode;
-    pub use hyper::status::StatusCode::*;
-}
 
 /// Sapper error enum
 #[derive(Debug, PartialEq, Clone)]
@@ -51,8 +37,13 @@ pub enum Error {
 /// EightFish result struct
 pub type Result<T> = ::std::result::Result<T, Error>;
 
-
-
+/// GlobalFilter trait, used to place global `before` and `after` middlewares
+pub trait GlobalFilter {
+    fn before(&self, &mut EightFishRequest) -> Result<()>;
+    fn after(&self, &EightFishRequest, &mut EightFishResponse) -> Result<()>;
+}
+type GlobalFilterType = Box<dyn GlobalFilter + 'static + Send + Sync>;
+type GlobalInitClosure = Box<dyn Fn(&mut EightFishRequest) -> Result<()> + 'static + Send + Sync>;
 
 /// EightFish module trait
 /// 3 methods: before, after, router
@@ -71,12 +62,13 @@ pub trait EightFishModule: Sync + Send {
     fn router(&self, &mut EightFishRouter) -> Result<()>;
 }
 
-type GlobalInitClosure = Box<Fn(&mut EightFishRequest) -> Result<()> + 'static + Send + Sync>;
 
 /// EightFish app struct
 pub struct EightFishApp {
     // router actually use to recognize
     pub router: Router,
+    // global filter if exists
+    pub global_filter: Option<Arc<GlobalFilterType>>,
     // if need init something, put them here
     pub init_closure: Option<Arc<GlobalInitClosure>>,
     // 404 not found page
@@ -87,6 +79,7 @@ impl EightFishApp {
     pub fn new() -> EightFishApp {
         EightFishApp {
             router: Router::new(),
+            global_filter: None,
             init_closure: None,
             not_found: None,
         }
@@ -104,6 +97,12 @@ impl EightFishApp {
         self
     }
 
+    // add global filter
+    pub fn add_global_filter(&mut self, w: GlobalFilterType) -> &mut Self {
+        self.global_filter = Some(Arc::new(w));
+        self
+    }
+
     // add routers of one module to global router
     pub fn add_module(&mut self, sm: Box<EightFishModule>) -> &mut Self {
         let mut router = EightFishRouter::new();
@@ -118,6 +117,7 @@ impl EightFishApp {
                 let glob = glob.clone();
                 let handler = handler.clone();
                 let sm = sm.clone();
+                let global_filter = self.global_filter.clone();
                 let init_closure = self.init_closure.clone();
 
                 self.router.route(
@@ -128,15 +128,15 @@ impl EightFishApp {
                             if let Some(ref c) = init_closure {
                                 c(req)?;
                             }
-                            //if let Some(ref armor) = armor {
-                            //    armor.before(req)?;
-                            //}
+                            if let Some(ref global_filter) = global_filter {
+                                global_filter.before(req)?;
+                            }
                             sm.before(req)?;
                             let mut response: EightFishResponse = handler.handle(req)?;
                             sm.after(req, &mut response)?;
-                            //if let Some(ref armor) = armor {
-                            //    armor.after(req, &mut response)?;
-                            //}
+                            if let Some(ref global_filter) = global_filter {
+                                global_filter.after(req, &mut response)?;
+                            }
                             Ok(response)
                         },
                     )),
@@ -151,7 +151,7 @@ impl EightFishApp {
 
 impl Handler for EightFishApp {
     /// do actual handling for a request
-    fn handle(&self, mut req: EightFishRequest) {
+    fn handle(&self, mut req: EightFishRequest) -> Result<EightFishResponse> {
         let path = req.path.clone();
 
         // pass req to router, execute matched biz handler

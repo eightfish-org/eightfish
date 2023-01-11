@@ -54,6 +54,12 @@ impl Worker {
                 let ef_req = EightFishRequest::new(method, path, payload.reqdata);
 
                 let ef_res = self.app.handle(ef_req);
+                if ef_res.is_err() {
+                    return Err(anyhow!());
+                }
+
+                // ef_res.info here could also contain the modelname 
+                // let modelname = ef_res.info;
 
                 // we can retrieve the model name from the path
                 // but that will force the developer use a strict unified url shcema in his product
