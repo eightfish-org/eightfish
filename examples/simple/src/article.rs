@@ -16,7 +16,7 @@ pub struct Article {
 pub struct ArticleModule;
 
 impl ArticleModule {
-    fn get_one(req: &mut Request) -> Result<Response<Article>> {
+    fn get_one(req: &mut Request) -> Result<Response> {
         let pg_addr = std::env::var(DB_URL_ENV)?;
         let redis_addr = std::env::var(REDIS_URL_ENV)?;
 
@@ -57,15 +57,19 @@ impl ArticleModule {
             results.push(article);
         }
 
-        let response = Response::new(
-            Status::Successful, 
-            "article:get_one".to_string(), 
-            results);
+        let info = Info {
+            model_name: "article".to_string(),
+            action: "get_one".to_string(),
+            target: id.clone(),
+            extra: "".to_string(),
+        }
+
+        let response = Response::new(Status::Successful, info, results);
 
         Ok(response)
     }
 
-    fn new(req: &mut Request) -> Result<Response<Article>> {
+    fn new(req: &mut Request) -> Result<Response> {
 
         let pg_addr = std::env::var(DB_URL_ENV)?;
         let redis_addr = std::env::var(REDIS_URL_ENV)?;
@@ -104,15 +108,19 @@ impl ArticleModule {
         let mut results: Vec<Article> = vec![];
         results.push(article);
 
-        let response = Response::new(
-            Status::Successful, 
-            "article:new".to_string(), 
-            results);
+        let info = Info {
+            model_name: "article".to_string(),
+            action: "new".to_string(),
+            target: id.clone(),
+            extra: "".to_string(),
+        }
+
+        let response = Response::new(Status::Successful, info, results);
 
         Ok(response)
     }
 
-    fn update(req: &mut Request) -> Result<Response<Article>> {
+    fn update(req: &mut Request) -> Result<Response> {
 
         let pg_addr = std::env::var(DB_URL_ENV)?;
         let redis_addr = std::env::var(REDIS_URL_ENV)?;
@@ -150,15 +158,19 @@ impl ArticleModule {
         let mut results: Vec<Article> = vec![];
         results.push(article);
 
-        let response = Response::new(
-            Status::Successful, 
-            "article:update".to_string(), 
-            results);
+        let info = Info {
+            model_name: "article".to_string(),
+            action: "update".to_string(),
+            target: id.clone(),
+            extra: "".to_string(),
+        }
+
+        let response = Response::new(Status::Successful, info, results);
 
         Ok(response)
     }
 
-    fn delete(req: &mut Request) -> Result<Response<Article>> {
+    fn delete(req: &mut Request) -> Result<Response> {
         let pg_addr = std::env::var(DB_URL_ENV)?;
         let redis_addr = std::env::var(REDIS_URL_ENV)?;
 
@@ -184,10 +196,14 @@ impl ArticleModule {
 
         let results: Vec<Article> = vec![];
 
-        let response = Response::new(
-            Status::Successful, 
-            "article:delete:{id}".to_string(), 
-            results);
+        let info = Info {
+            model_name: "article".to_string(),
+            action: "delete".to_string(),
+            target: id.clone(),
+            extra: "".to_string(),
+        }
+
+        let response = Response::new(Status::Successful, info, results);
 
         Ok(response)
     }

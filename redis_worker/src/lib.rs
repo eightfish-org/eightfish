@@ -3,12 +3,13 @@ use spin_sdk::{
     redis_component
 };
 
-use myapp::start as myapp_start;
+use myapp::build_app;
 mod worker;
 
 #[redis_component]
 fn on_message(message: Bytes) -> Result<()> {
-    let app = myapp_start();
+    // later put this construtor to outer OnceCell
+    let app = build_app();
     let aw = worker::Worker::mount(app)?;
     aw.work(message)?
 

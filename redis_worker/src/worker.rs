@@ -79,7 +79,7 @@ impl Worker {
 
                 let ef_res = self.app.handle(ef_req);
 
-                let pair_list = inner_stuffs_on_post_result(&ef_res, &instance_hash);
+                let pair_list = inner_stuffs_on_post_result(&ef_res);
 
                 tail_post_process(&redis_addr, reqid, &modelname, &pair_list);
             }
@@ -200,17 +200,15 @@ impl IdHashPair for ArticleHash {
 
 // TODO: fill all logic
 fn inner_stuffs_on_query_result(res: &EightFishResponse) -> Result<Vec<String, String>, > {
-    let table_name = res.info;
-    let results = &res.results;
+    let table_name = res.info.model_name;
+    let pair_list = &res.pair_list.clone();
     // get the id list from obj list
-    let ids = ...;
-    let ids_string = ids. to a list, delimited by a comma;
+    let ids = pair_list.map(|&(id, hash)| id.to_owned()).collect();
+    let ids_string = ids.join(',');
 
     let query_string = format!("select id, hash from {table_name}_idhash where id in ({ids_string})");
     let rowset = pg::query(&pg_addr, &query_string, &vec![]).unwrap();
 
-    // convert the raw vec[u8] to every rust struct filed, and convert the whole into a
-    // rust struct vec, later we may find a gerneral type converter way
     let mut idhash_map: HashMap<String, String> = HashMap::New();
     for row in rowset.rows {
         let id = String::decode(&row[0])?;
@@ -220,55 +218,47 @@ fn inner_stuffs_on_query_result(res: &EightFishResponse) -> Result<Vec<String, S
     }
 
     // iterate on the input results to check
-    // meanwhile construct a (id-hash) pair list
-    let mut pair_list: Vec<(String, String)> = vec![];
-    for obj in results {
-        let id = obj.id();
-        let calced_hash = obj.calc_hash().unwrap();
+    for (id, chash) in pair_list {
         let hash_from_map = idhash_map.get(id).expect("");
-        if calced_hash != hash_from_map {
+        if chash != hash_from_map {
             return Err(anyhow!("Hash mismatching.".to_string()));
         }
-        pair_list.push((id, hash_from_map));
     }
 
     // store to cache for http gate to retrieve
-    let data_to_cache = serde_json::to_string(results).unwrap();
+    let data_to_cache = res.results.unwrap_or("".to_string());
     _ = redis::set(redis_addr, &format!("tmp:cache:{reqid}"), &data_to_cache.as_bytes());
 
     Ok(pair_list)
 }
 
 fn inner_stuffs_on_post_result(res: &EightFishResponse) -> Result<Vec<String, String>, > {
-    let info_items = res.info. ...;
-    let table_name = info_items[0];
-
-    if res.results.is_empty() && info_items[1] == "delete" {
-        // means it's a delete action
-        id = info_items[2];
-        ins_hash = "".to_string();
-    } else {
-        let obj = &res.results[0];
-        let id = obj.id();
-        ins_hash = obj.calc_hash();
+    let table_name = res.info.model_name;
+    let id = res.info.target;
+    let action = res.info.action;
+    let mut ins_hash = String::new();
+    if res.pair_list.is_some() {
+        let pair = res.pair_list.clone().unwrap()[0];
+        ins_hash = pair.1;
     }
 
-    if info_items[1] == "delete" {
-        let sql_string = format!("delete {table_name}_idhash where id='{id}'");
-        let _execute_results = pg::execute(&pg_addr, &sql_string, &vec![]);
-        // TODO: check the pg result
-
-    } else if info_items[1] == "update" {
-        let sql_string = format!("update {table_name}_idhash set id={id}, hash={ins_hash} where id='{id}'");
-        let _execute_results = pg::execute(&pg_addr, &sql_string, &vec![]);
-
-    } else {
+    if action == "new"{
         let sql_string = format!("insert into {table_name}_idhash values ({}, {})", id, ins_hash);
         let _execute_results = pg::execute(&pg_addr, &sql_string, &vec![]);
         // TODO: check the pg result
 
+    } else if action == "update" {
+        let sql_string = format!("update {table_name}_idhash set id={id}, hash={ins_hash} where id='{id}'");
+        let _execute_results = pg::execute(&pg_addr, &sql_string, &vec![]);
+
+    } else if action == "delete" {
+        let sql_string = format!("delete {table_name}_idhash where id='{id}'");
+        let _execute_results = pg::execute(&pg_addr, &sql_string, &vec![]);
+        // TODO: check the pg result
     }
-    // TODO: handle update
+    else {
+
+    }
 
     let mut pair_list: Vec<(String, String)> = vec![];
     pair_list.push((id, ins_hash));

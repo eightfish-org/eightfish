@@ -3,18 +3,47 @@ pub enum Status {
     Failed,
 }
 
-pub struct EightFishResponse<T: CalcHash + Serialize> {
-    status: Status,
-    info: String,
-    results: Vec<T>
+#[derive(Default)]
+pub struct Info {
+    model_name: String,
+    action: String,
+    target: String,
+    extra: String,
 }
 
-impl<T: CalcHash + Serialize> EightFishResponse<T> {
-    pub fn new() -> EightFishResponse<T> {
+pub struct EightFishResponse {
+    status: Status,
+    info: Info,
+    pair_list: Option<Vec<(String, String)>>,
+    results: Option<String>,
+}
+
+fn<T: Serialize> do_serialization(results: Vec<T>) -> String {
+    serde_json::to_string(&results).unwrap()
+}
+
+
+impl EightFishResponse {
+    pub fn<T: Serialize + CalcHash> new(status: Status, info: Info, aresults: Vec<T>) -> EightFishResponse {
+       
+        let mut pair_list;
+        let mut results;
+
+        if aresults.is_empty() {
+            pair_list = None;
+            results = None;
+        } else {
+            let a_pair_list = aresults.map(|&obj| (obj.id(), obj.calc_hash())).collect();
+            pair_list = Some(a_pair_list);
+            let output = do_serialization(results);
+            results = Some(output);
+        }
+
         EightFishResponse {
-            status: Status::Successful,
-            info: String::new(),
-            results: Vec::new(),
+            status,
+            info,
+            pair_list,
+            results,
         }
     }
 
@@ -34,17 +63,22 @@ impl<T: CalcHash + Serialize> EightFishResponse<T> {
     }
 
     /// set response info
-    pub fn set_info(&mut self, info: String) {
+    pub fn set_info(&mut self, info: Info) {
         self.info = info;
     }
 
+    /// get response pair_list
+    pub fn pair_list(&self) -> &Option<(String, String)> {
+        &self.pair_list
+    }
+
     /// get response results
-    pub fn results(&self) -> &<Vec<T>> {
+    pub fn results(&self) -> &Option<String> {
         &self.results
     }
 
     /// set results
-    pub fn set_results(&mut self, results: Vec<T>) {
+    pub fn set_results(&mut self, results: Option<String>) {
         self.results = results;
     }
 
