@@ -20,20 +20,9 @@ impl ArticleModule {
         let pg_addr = std::env::var(DB_URL_ENV)?;
         let redis_addr = std::env::var(REDIS_URL_ENV)?;
 
-        // first part, we need to parse the params data into a structure
-        let mut params: HashMap<String, String> = HashMap::new();
+        let params = req.parse_urlenoded()?;
 
-        if data.is_some() {
-            let _parse = form_urlencoded::parse(&data.as_ref().unwrap().as_bytes());
-            // Iterate this _parse, push values into params
-            for pair in _parse {
-                let key = pair.0.to_string();
-                let val = pair.1.to_string();
-                params.insert(key, val);
-            }
-        }
-
-        let article_id = params.get("id").unwrap();
+        let article_id = params.get("id")?;
         // construct a sql statement 
         let query_string = format!("select id, title, content, author from article where id='{article_id}'");
         let rowset = pg::query(&pg_addr, &query_string, &vec![]).unwrap();
@@ -74,22 +63,11 @@ impl ArticleModule {
         let pg_addr = std::env::var(DB_URL_ENV)?;
         let redis_addr = std::env::var(REDIS_URL_ENV)?;
 
-        let mut params: HashMap<String, String> = HashMap::new();
-        if data.is_some() {
-            // first part, we need to parse the params data into a structure
-            let _parse = form_urlencoded::parse(&data.as_ref().unwrap().as_bytes());
+        let params = req.parse_urlenoded()?;
 
-            // Iterate this _parse, push values into params
-            for pair in _parse {
-                let key = pair.0.to_string();
-                let val = pair.1.to_string();
-                params.insert(key, val);
-            }
-        }
-
-        let title = params.get("title").unwrap();
-        let content = params.get("content").unwrap();
-        let authorname = params.get("authorname").unwrap();
+        let title = params.get("title")?;
+        let content = params.get("content")?;
+        let authorname = params.get("authorname")?;
 
         let id = Uuid::new_v4().simple().to_string(); // uuid
 

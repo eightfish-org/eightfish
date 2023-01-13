@@ -47,4 +47,19 @@ impl EightFishRequest {
     pub fn ext_mut(&mut self) -> &mut TypeMap {
         &mut self.ext
     }
+
+    pub fn parse_urlencoded(&self) -> HashMap<String, String> {
+        let mut params: HashMap<String, String> = HashMap::new();
+
+        if self.data.is_some() {
+            let _parse = form_urlencoded::parse(&data.as_ref().unwrap().as_bytes());
+            for pair in _parse {
+                let key = pair.0.to_string();
+                let val = pair.1.to_string();
+                params.insert(key, val);
+            }
+        }
+
+        params
+    }
 }
