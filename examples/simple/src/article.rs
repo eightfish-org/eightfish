@@ -18,7 +18,6 @@ pub struct ArticleModule;
 impl ArticleModule {
     fn get_one(req: &mut Request) -> Result<Response> {
         let pg_addr = std::env::var(DB_URL_ENV)?;
-        let redis_addr = std::env::var(REDIS_URL_ENV)?;
 
         let params = req.parse_urlenoded()?;
 
@@ -61,7 +60,6 @@ impl ArticleModule {
     fn new(req: &mut Request) -> Result<Response> {
 
         let pg_addr = std::env::var(DB_URL_ENV)?;
-        let redis_addr = std::env::var(REDIS_URL_ENV)?;
 
         let params = req.parse_urlenoded()?;
 
@@ -101,25 +99,13 @@ impl ArticleModule {
     fn update(req: &mut Request) -> Result<Response> {
 
         let pg_addr = std::env::var(DB_URL_ENV)?;
-        let redis_addr = std::env::var(REDIS_URL_ENV)?;
 
-        let mut params: HashMap<String, String> = HashMap::new();
-        if data.is_some() {
-            // first part, we need to parse the params data into a structure
-            let _parse = form_urlencoded::parse(&data.as_ref().unwrap().as_bytes());
+        let params = req.parse_urlenoded()?;
 
-            // Iterate this _parse, push values into params
-            for pair in _parse {
-                let key = pair.0.to_string();
-                let val = pair.1.to_string();
-                params.insert(key, val);
-            }
-        }
-
-        let id = params.get("id").unwrap();
-        let title = params.get("title").unwrap();
-        let content = params.get("content").unwrap();
-        let authorname = params.get("authorname").unwrap();
+        let id = params.get("id")?;
+        let title = params.get("title")?;
+        let content = params.get("content")?;
+        let authorname = params.get("authorname")?;
 
         // construct a struct
         let article = Article {
@@ -150,22 +136,10 @@ impl ArticleModule {
 
     fn delete(req: &mut Request) -> Result<Response> {
         let pg_addr = std::env::var(DB_URL_ENV)?;
-        let redis_addr = std::env::var(REDIS_URL_ENV)?;
 
-        let mut params: HashMap<String, String> = HashMap::new();
-        if data.is_some() {
-            // first part, we need to parse the params data into a structure
-            let _parse = form_urlencoded::parse(&data.as_ref().unwrap().as_bytes());
+        let params = req.parse_urlenoded()?;
 
-            // Iterate this _parse, push values into params
-            for pair in _parse {
-                let key = pair.0.to_string();
-                let val = pair.1.to_string();
-                params.insert(key, val);
-            }
-        }
-
-        let id = params.get("id").unwrap();
+        let id = params.get("id")?;
 
         // construct a sql statement 
         let sql_string = format!("delete article where id='{id}'");
