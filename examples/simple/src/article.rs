@@ -30,17 +30,18 @@ impl ArticleModule {
         // rust struct vec, later we may find a gerneral type converter way
         let mut results: Vec<Article> = vec![];
         for row in rowset.rows {
-            let id = String::decode(&row[0])?;
-            let title = String::decode(&row[1])?;
-            let content = String::decode(&row[2])?;
-            let authorname = String::decode(&row[3])?;
+            //let id = String::decode(&row[0])?;
+            //let title = String::decode(&row[1])?;
+            //let content = String::decode(&row[2])?;
+            //let authorname = String::decode(&row[3])?;
 
-            let article = Article {
-                id,
-                title,
-                content,
-                authorname,
-            };
+            //let article = Article {
+            //    id,
+            //    title,
+            //    content,
+            //    authorname,
+            //};
+            let article = Article::from_row(&row);
 
             results.push(article);
         }
