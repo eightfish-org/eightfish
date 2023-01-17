@@ -1,0 +1,32 @@
+[package]
+name = "openforum-rpc"
+version = "0.1.0"
+edition = "2018"
+authors = ['Substrate DevHub <https://github.com/substrate-developer-hub>']
+repository = 'https://github.com/substrate-developer-hub/recipes'
+description = "A pallet that demonstrates simple RPC for summing numbers"
+license = "GPL-3.0-or-later"
+
+[dependencies]
+codec = { package = "parity-scale-codec", version = "1.3.0" }
+serde = { version = "1.0", features = ["derive"], optional = true }
+jsonrpsee = { version = "0.14.0", features = ["server", "macros"] }
+
+# Substrate packages
+
+sp-api = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.26" }
+sp-blockchain = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.26" }
+sp-rpc= { version = "6.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.26" }
+sp-runtime= { version = "6.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.26" }
+
+# local packages
+openforum-runtime-api = { path = "../runtime-api", default-features = false }
+
+[features]
+default = ["std"]
+std = [
+  "serde",
+  "sp-api/std",
+  "sp-runtime/std",
+  "openforum-runtime-api/std"
+]
