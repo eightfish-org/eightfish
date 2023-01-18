@@ -1,5 +1,5 @@
 [package]
-name = "openforum-rpc"
+name = "eightfish-rpc"
 version = "0.1.0"
 edition = "2018"
 authors = ['Substrate DevHub <https://github.com/substrate-developer-hub>']
@@ -20,7 +20,7 @@ sp-rpc= { version = "6.0.0", default-features = false, git = "https://github.com
 sp-runtime= { version = "6.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.26" }
 
 # local packages
-openforum-runtime-api = { path = "../runtime-api", default-features = false }
+eightfish-runtime-api = { path = "../runtime-api", default-features = false }
 
 [features]
 default = ["std"]
@@ -28,5 +28,5 @@ std = [
   "serde",
   "sp-api/std",
   "sp-runtime/std",
-  "openforum-runtime-api/std"
+  "eightfish-runtime-api/std"
 ]

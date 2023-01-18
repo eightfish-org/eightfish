@@ -1,4 +1,4 @@
-use openforum_runtime::{
+use eightfish_runtime::{
 	AccountId, AuraConfig, BalancesConfig, GenesisConfig, GrandpaConfig, Signature, SudoConfig,
 	SystemConfig, WASM_BINARY,
 };

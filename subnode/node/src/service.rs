@@ -1,6 +1,6 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
 
-use openforum_runtime::{self, opaque::Block, RuntimeApi};
+use eightfish_runtime::{self, opaque::Block, RuntimeApi};
 use sc_client_api::{BlockBackend, ExecutorProvider};
 use sc_consensus_aura::{ImportQueueParams, SlotProportion, StartAuraParams};
 pub use sc_executor::NativeElseWasmExecutor;
@@ -23,11 +23,11 @@ impl sc_executor::NativeExecutionDispatch for ExecutorDispatch {
 	type ExtendHostFunctions = ();
 
 	fn dispatch(method: &str, data: &[u8]) -> Option<Vec<u8>> {
-		openforum_runtime::api::dispatch(method, data)
+		eightfish_runtime::api::dispatch(method, data)
 	}
 
 	fn native_version() -> sc_executor::NativeVersion {
-		openforum_runtime::native_version()
+		eightfish_runtime::native_version()
 	}
 }
 

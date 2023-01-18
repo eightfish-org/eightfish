@@ -9,27 +9,27 @@ use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
 use sp_runtime::{generic::BlockId, traits::Block as BlockT};
 use std::sync::Arc;
-use openforum_runtime_api::OpenForumApi as OpenForumRuntimeApi;
+use eightfish_runtime_api::EightFishApi as EightFishRuntimeApi;
 
 #[rpc(client, server)]
-pub trait OpenForumRpc<BlockHash> {
-    #[method(name = "openforum_check_pair_list")]
+pub trait EightFishRpc<BlockHash> {
+    #[method(name = "eightfish_check_pair_list")]
 	fn check_pair_list(&self, 
                        at: Option<BlockHash>,
                        model: Vec<u8>, 
                        pair_list: Vec<(Vec<u8>, Vec<u8>)>) -> RpcResult<bool>;
 }
 
-/// A struct that implements the `OpenForumRpc`.
-pub struct OpenForum<C, M> {
+/// A struct that implements the `EightFishRpc`.
+pub struct EightFish<C, M> {
 	// If you have more generics, no need to SumStorage<C, M, N, P, ...>
 	// just use a tuple like SumStorage<C, (M, N, P, ...)>
 	client: Arc<C>,
 	_marker: std::marker::PhantomData<M>,
 }
 
-impl<C, M> OpenForum<C, M> {
-	/// Create new `OpenForum` instance with the given reference to the client.
+impl<C, M> EightFish<C, M> {
+	/// Create new `EightFish` instance with the given reference to the client.
 	pub fn new(client: Arc<C>) -> Self {
 		Self {
 			client,
@@ -56,13 +56,13 @@ impl From<Error> for i32 {
 }
 
 #[async_trait]
-impl<C, Block> OpenForumRpcServer<<Block as BlockT>::Hash> for OpenForum<C, Block>
+impl<C, Block> EightFishRpcServer<<Block as BlockT>::Hash> for EightFish<C, Block>
 where
 	Block: BlockT,
 	C: Send + Sync + 'static,
 	C: ProvideRuntimeApi<Block>,
 	C: HeaderBackend<Block>,
-	C::Api: OpenForumRuntimeApi<Block>,
+	C::Api: EightFishRuntimeApi<Block>,
 {
 	fn check_pair_list(&self, 
                         at: Option<<Block as BlockT>::Hash>, 

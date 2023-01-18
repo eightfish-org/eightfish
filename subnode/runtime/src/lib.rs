@@ -44,7 +44,7 @@ pub use sp_runtime::BuildStorage;
 pub use sp_runtime::{Perbill, Permill};
 
 /// Import the template pallet.
-pub use pallet_openforum;
+pub use pallet_eightfish;
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -263,7 +263,7 @@ impl pallet_sudo::Config for Runtime {
 }
 
 /// Configure the pallet-template in pallets/template.
-impl pallet_openforum::Config for Runtime {
+impl pallet_eightfish::Config for Runtime {
 	type Event = Event;
     type TimeProvider = pallet_timestamp::Pallet<Runtime>;
 }
@@ -284,7 +284,7 @@ construct_runtime!(
 		TransactionPayment: pallet_transaction_payment,
 		Sudo: pallet_sudo,
 		// Include the custom logic from the pallet-open in the runtime.
-		OpenForumModule: pallet_openforum,
+		EightFishModule: pallet_eightfish,
 	}
 );
 
@@ -329,7 +329,7 @@ mod benches {
 		[frame_system, SystemBench::<Runtime>]
 		[pallet_balances, Balances]
 		[pallet_timestamp, Timestamp]
-		[pallet_openforum, OpenForumModule]
+		[pallet_eightfish, EightFishModule]
 	);
 }
 
@@ -465,10 +465,10 @@ impl_runtime_apis! {
 	}
 
 
-    // The runtime api from openforum module
-    impl openforum_runtime_api::OpenForumApi<Block> for Runtime {
+    // The runtime api from eightfish module
+    impl eightfish_runtime_api::EightFishApi<Block> for Runtime {
 		fn check_pair_list(model: Vec<u8>, list: Vec<(Vec<u8>, Vec<u8>)>) -> bool {
-            OpenForumModule::check_pair_list(model, list)
+            EightFishModule::check_pair_list(model, list)
         }
     }
 

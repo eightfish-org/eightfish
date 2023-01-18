@@ -5,7 +5,7 @@ use crate::{
 	service,
 };
 use frame_benchmarking_cli::{BenchmarkCmd, SUBSTRATE_REFERENCE_HARDWARE};
-use openforum_runtime::Block;
+use eightfish_runtime::Block;
 use sc_cli::{ChainSpec, RuntimeVersion, SubstrateCli};
 use sc_service::PartialComponents;
 use std::sync::Arc;
@@ -45,7 +45,7 @@ impl SubstrateCli for Cli {
 	}
 
 	fn native_runtime_version(_: &Box<dyn ChainSpec>) -> &'static RuntimeVersion {
-		&openforum_runtime::VERSION
+		&eightfish_runtime::VERSION
 	}
 }
 

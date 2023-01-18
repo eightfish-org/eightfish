@@ -1,5 +1,5 @@
 [package]
-name = "openforum-subnode"
+name = "eightfish-subnode"
 version = "4.0.0-dev"
 description = "A fresh FRAME-based Substrate node, ready for hacking."
 authors = ["Substrate DevHub <https://github.com/substrate-developer-hub>"]
@@ -14,7 +14,7 @@ build = "build.rs"
 targets = ["x86_64-unknown-linux-gnu"]
 
 [[bin]]
-name = "openforum-subnode"
+name = "eightfish-subnode"
 
 [dependencies]
 clap = { version = "3.1.18", features = ["derive"] }
@@ -57,9 +57,9 @@ frame-benchmarking = { version = "4.0.0-dev", git = "https://github.com/parityte
 frame-benchmarking-cli = { version = "4.0.0-dev", git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.26" }
 
 # Local Dependencies
-openforum-runtime = { version = "4.0.0-dev", path = "../runtime" }
-openforum-rpc = { path = "../pallets/openforum/rpc" }
-openforum-runtime-api = { path = "../pallets/openforum/runtime-api" }
+eightfish-runtime = { version = "4.0.0-dev", path = "../runtime" }
+eightfish-rpc = { path = "../pallets/eightfish/rpc" }
+eightfish-runtime-api = { path = "../pallets/eightfish/runtime-api" }
 
 # CLI-specific dependencies
 try-runtime-cli = { version = "0.10.0-dev", optional = true, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.26" }
@@ -69,7 +69,7 @@ substrate-build-script-utils = { version = "3.0.0", git = "https://github.com/pa
 
 [features]
 default = []
-runtime-benchmarks = ["openforum-runtime/runtime-benchmarks"]
+runtime-benchmarks = ["eightfish-runtime/runtime-benchmarks"]
 # Enable features that allow the runtime to be tried and debugged. Name might be subject to change
 # in the near future.
-try-runtime = ["openforum-runtime/try-runtime", "try-runtime-cli"]
+try-runtime = ["eightfish-runtime/try-runtime", "try-runtime-cli"]

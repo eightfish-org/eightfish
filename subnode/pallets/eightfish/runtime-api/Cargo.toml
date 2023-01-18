@@ -1,5 +1,5 @@
 [package]
-name = "openforum-runtime-api"
+name = "eightfish-runtime-api"
 version = "0.1.0"
 authors = ['Mike Tang <daogangtang@gmail.com>']
 edition = "2018"
