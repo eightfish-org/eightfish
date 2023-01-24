@@ -49,8 +49,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let api = OnlineClient::<SubstrateConfig>::new().await?;
 
         let mut of_events = api.events().subscribe().await?.filter_events::<(
-            substrate::open_forum_module::events::Action,
-            substrate::open_forum_module::events::IndexUpdated)>();
+            substrate::eight_fish_module::events::Action,
+            substrate::eight_fish_module::events::IndexUpdated)>();
 
         while let Some(evt) = of_events.next().await {
             let event_details = evt?;
@@ -124,8 +124,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             if &msg_obj.action== "post" {
                 // construct act tx
                 let tx = substrate::tx()
-                    //.openforum()
-                    .open_forum_module()
+                    .eight_fish_module()
                     .act(msg_obj.model.as_bytes().to_vec(), msg_obj.action.as_bytes().to_vec(), msg_obj.data);
 
                 // Submit the transaction with default params:
@@ -139,8 +138,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let (id, hash) = payload.reqdata[0].clone();
 
                 let tx = substrate::tx()
-                    //.openforum()
-                    .open_forum_module()
+                    .eight_fish_module()
                     .update_index(msg_obj.model.as_bytes().to_vec(), payload.reqid.as_bytes().to_vec(), id.as_bytes().to_vec(), hash.as_bytes().to_vec());
 
                 let _hash = api.tx().sign_and_submit_default(&tx, &signer).await.unwrap();
@@ -175,38 +173,45 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             } else if &msg_obj.action== "check_new_version_wasmfile" {
 
-                let wasmfile_new_flag = substrate::storage().open_forum_module().wasmfile_new_flag();
-                let new_flag: Vec<u8> = api.storage().fetch(&wasmfile_new_flag, None).await;
-
-                // send packet back to the spin runtime
-                let output = InputOutputObject {
-                    model: msg_obj.model,
-                    action: msg_obj.action,
-                    data: new_flag,
-                    time: 0,
-                };
-                let output_vec = serde_json::to_vec(&output).unwrap();
-                redis_conn1.publish("proxy2upgrade", output_vec).await?;
+                let wasmfile_new_flag = substrate::storage().eight_fish_module().wasm_file_new_flag();
+                let new_flag: Option<bool> = api.storage().fetch(&wasmfile_new_flag, None).await.unwrap();
+                if let Some(flag) = new_flag {
+                    // send packet back to the spin runtime
+                    let output = InputOutputObject {
+                        model: msg_obj.model,
+                        action: msg_obj.action,
+                        data: flag.to_string().as_bytes().to_vec(),
+                        time: 0,
+                    };
+                    let output_vec = serde_json::to_vec(&output).unwrap();
+                    redis_conn1.publish("proxy2upgrade", output_vec).await?;
+                } else {
+                    println!("check_new_version_wasmfile error, return None");
+                }
 
             } else if &msg_obj.action== "retreive_wasmfile" {
 
-                let wasmfile= substrate::storage().open_forum_module().wasmfile();
-                let wasmfile_content: Vec<u8> = api.storage().fetch(&wasmfile, None).await;
+                let wasmfile= substrate::storage().eight_fish_module().wasm_file();
+                let wasmfile_content: Option<Vec<u8>> = api.storage().fetch(&wasmfile, None).await.unwrap();
 
-                // send packet back to the spin runtime
-                let output = InputOutputObject {
-                    model: msg_obj.model,
-                    action: msg_obj.action,
-                    data: wasmfile_content,
-                    time: 0,
-                };
-                let output_vec = serde_json::to_vec(&output).unwrap();
-                redis_conn1.publish("proxy2upgrade", output_vec).await?;
+                if let Some(wasmfile) = wasmfile_content {
+                    // send packet back to the spin runtime
+                    let output = InputOutputObject {
+                        model: msg_obj.model,
+                        action: msg_obj.action,
+                        data: wasmfile,
+                        time: 0,
+                    };
+                    let output_vec = serde_json::to_vec(&output).unwrap();
+                    redis_conn1.publish("proxy2upgrade", output_vec).await?;
+                } else {
+                    println!("retreive_wasmfile error, return None");
+                }
 
             } else if &msg_obj.action== "disable_wasm_upgrade_flag" {
 
                 let tx = substrate::tx()
-                    .open_forum_module()
+                    .eight_fish_module()
                     .disable_wasm_upgrade_flag();
 
                 let _hash = api.tx().sign_and_submit_default(&tx, &signer).await.unwrap();
