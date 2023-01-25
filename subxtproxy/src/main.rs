@@ -158,7 +158,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 let ret_payload = json!({
                     "reqid": payload.reqid,
-                    "reqdata": check_boolean.to_string(),
+                    "reqdata": Some(check_boolean.to_string()),
                 });
 
                 // send packet back to the spin runtime

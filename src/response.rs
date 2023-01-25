@@ -13,6 +13,19 @@ pub struct Info {
     extra: String,
 }
 
+// code put here temporarily, this func would be put into the eightfish-derive crate to 
+// implemented on struct
+fn calc_hash<T: Serialize>(obj: &T) -> Result<String> {
+    // I think we can use json_digest to do the deterministic hash calculating
+    // https://docs.rs/json-digest/0.0.16/json_digest/
+    let json_val= serde_json::to_value(obj).unwrap();
+    let digest = json_digest::digest_data(&json_val).unwrap();
+
+    Ok(digest)
+}
+
+
+
 
 pub struct EightFishResponse {
     status: Status,

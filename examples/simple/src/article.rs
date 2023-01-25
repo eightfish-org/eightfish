@@ -12,6 +12,33 @@ pub struct Article {
     authorname: String,
 }
 
+/// for performance
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArticleHash {
+    item: Article,
+    hash: String,
+}
+
+
+trait IdHashPair {
+    ///
+    fn id(&self) -> String;
+
+    ///
+    fn hash(&self) -> String;
+
+}
+
+impl IdHashPair for ArticleHash {
+    
+    fn id(&self) -> String {
+        self.item.id.to_string()
+    }
+
+    fn hash(&self) -> String {
+        self.hash.to_string()
+    }
+}
 
 pub struct ArticleModule;
 
