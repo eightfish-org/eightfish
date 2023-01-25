@@ -1,8 +1,35 @@
 [package]
-name = "simple"
+name    = "simple"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+crate-type = [ "cdylib" ]
 
 [dependencies]
+# Useful crate to handle errors.
+anyhow = "1"
+# Crate to simplify working with bytes.
+bytes = "1"
+# The Spin SDK.
+spin-sdk = { path = "../../spin/sdk/rust" }
+# Crate that generates Rust Wasm bindings from a WebAssembly interface.
+wit-bindgen-rust = { git = "https://github.com/bytecodealliance/wit-bindgen", rev = "cb871cfa1ee460b51eb1d144b175b9aab9c50aba" }
+form_urlencoded = "1.1"
+serde = { version = '1.0', default-features = false, features = ['derive'] }
+serde_json = { version = '1.0', default-features = false, features = ['alloc'] }
+json-digest = "0.0.16"
+
+[dependencies.uuid]
+version = "1.1.2"
+features = [
+    "v4",                # Lets you generate random UUIDs
+    "fast-rng",          # Use a faster (but still sufficiently random) RNG
+    "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
+]
+
+spin-worker = { path="../../spin_worker" }
+
+[workspace]
+
+

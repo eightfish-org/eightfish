@@ -1,4 +1,12 @@
-use eightfish::App as EightFishApp;
+#![allow(dead_code)]
+use anyhow::Result;
+use bytes::Bytes;
+use spin_sdk::{redis_component};
+
+use eightfish::{
+    App as EightFishApp,
+    GlobalFilter,
+};
 
 mod article;
 
@@ -20,4 +28,15 @@ pub fn build_app() -> EightFishApp {
         .add_module(Box::new(artile::ArticleModule))
 }
 
+/// Main entry
+#[redis_component]
+fn on_message(message: Bytes) -> Result<()> {
+    // later put this construtor to outer OnceCell
+    let app = build_app();
+    let aw = spin_worker::Worker::mount(app)?;
+
+    aw.work(message)?
+
+    Ok(())
+}
 
