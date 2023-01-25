@@ -14,9 +14,9 @@ pub use app::EightFishApp as App;
 pub use app::GlobalFilter as GlobalFilter;
 pub use app::EightFishHandler as Handler;
 pub use app::EightFishModule as Module;
-pub use app::EightFishRequest as Request;
-pub use app::EightFishResponse as Response;
 pub use app::EightFishRouter as Router;
 pub use app::{Error, Key, Result};
+pub use request::{EightFishRequest as Request, Method};
+pub use response::{EightFishResponse as Response, Status, Info};
 
 pub use recognizer::Params as RecognizerParams;

@@ -1,11 +1,7 @@
 use std::clone::Clone;
-use std::fs::File;
-use std::io::Read;
-use std::path::Path;
-use std::str;
 use std::sync::Arc;
 
-pub use handler::EightFishHandler;
+//pub use handler::EightFishHandler;
 pub use request::EightFishRequest;
 pub use response::EightFishResponse;
 pub use router::EightFishRouter;
@@ -16,7 +12,7 @@ pub use typemap::Key;
 #[derive(Clone)]
 pub struct PathParams;
 
-/// Sapper error enum
+/// EightFish Error
 #[derive(Debug, PartialEq, Clone)]
 pub enum Error {
     //InvalidConfig,

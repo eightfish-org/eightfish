@@ -1,4 +1,4 @@
-use eightfish::{Module, Request, Response, Result, Router};
+use eightfish::{Module, Request, Response, Result, Router, Status, Info};
 
 
 const REDIS_URL_ENV: &str = "REDIS_URL";

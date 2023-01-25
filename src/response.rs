@@ -1,8 +1,10 @@
+/// Response status
 pub enum Status {
     Successful,
     Failed,
 }
 
+/// Response info
 #[derive(Default)]
 pub struct Info {
     model_name: String,
@@ -10,6 +12,7 @@ pub struct Info {
     target: String,
     extra: String,
 }
+
 
 pub struct EightFishResponse {
     status: Status,

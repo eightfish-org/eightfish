@@ -8,6 +8,11 @@ use spin_sdk::{
 use serde::{Serialize, Deserialize};
 use serde_json::json;
 use uuid::Uuid;
+use eightfish::{Method};
+
+const TMP_CACHE_RESULTS: &str = "tmp:cache:{}";
+
+
 
 #[derive(Deserialize, Debug)]
 pub struct InputOutputObject {
@@ -21,12 +26,6 @@ pub struct InputOutputObject {
 pub struct Payload {
     reqid: String,
     reqdata: Option<String>,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct Payload2 {
-    reqid: String,
-    reqdata: String,
 }
 
 pub struct Worker {
@@ -47,19 +46,21 @@ impl Worker {
         match &msg_obj.action[..] {
             "query" => {
                 let method = Method::Get;
+                // path info put in the model field from the http_gate
                 let path = msg_obj.model.to_owned();
-                let modelname = retrieve_model_name(&path);
                 let payload: Payload = serde_json::from_slice(&msg_obj.data)?;
+                let reqid = payload.reqid.to_owned();
+                let reqdata = payload.reqdata.to_owned();
 
-                let ef_req = EightFishRequest::new(method, path, payload.reqdata);
+                let ef_req = EightFishRequest::new(method, path, reqdata);
 
                 let ef_res = self.app.handle(ef_req);
                 if ef_res.is_err() {
-                    return Err(anyhow!());
+                    return Err(anyhow!("fooo"));
                 }
 
                 // we check the intermediate result  in the framework internal 
-                let pair_list = inner_stuffs_on_query_result(&ef_res);
+                let pair_list = inner_stuffs_on_query_result(&reqid, &ef_res).unwrap();
 
                 // ef_res.info here could also contain the modelname 
                 // let modelname = ef_res.info;
@@ -67,7 +68,7 @@ impl Worker {
                 // we can retrieve the model name from the path
                 // but that will force the developer use a strict unified url shcema in his product
                 // the names in query and post must MATCH
-                tail_query_process(&redis_addr, reqid, &modelname, &pair_list);
+                tail_query_process(&redis_addr, &reqid, &modelname, &pair_list);
             }
             "post" => {
                 let method = Method::Post;
@@ -199,7 +200,7 @@ impl IdHashPair for ArticleHash {
 }
 
 // TODO: fill all logic
-fn inner_stuffs_on_query_result(res: &EightFishResponse) -> Result<Vec<String, String>, > {
+fn inner_stuffs_on_query_result(reqid: &str, res: &EightFishResponse) -> Result<Vec<String, String>> {
     let table_name = res.info.model_name;
     let pair_list = &res.pair_list.clone();
     // get the id list from obj list
@@ -227,7 +228,7 @@ fn inner_stuffs_on_query_result(res: &EightFishResponse) -> Result<Vec<String, S
 
     // store to cache for http gate to retrieve
     let data_to_cache = res.results.unwrap_or("".to_string());
-    _ = redis::set(redis_addr, &format!("tmp:cache:{reqid}"), &data_to_cache.as_bytes());
+    _ = redis::set(redis_addr, &format!(TMP_CACHE_RESULTS, reqid), &data_to_cache.as_bytes());
 
     Ok(pair_list)
 }

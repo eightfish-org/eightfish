@@ -9,6 +9,6 @@ version = "0.1.0"
 id = "redis-worker"
 source = "target/wasm32-wasi/release/redis-worker.wasm"
 [component.trigger]
-channel="substrate2wasmengine"
+channel="spin2proxy"
 [component.build]
 command = "cargo build --target wasm32-wasi --release"

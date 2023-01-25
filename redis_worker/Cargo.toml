@@ -28,4 +28,6 @@ features = [
     "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
 ]
 
+myapp = { path="../examples/simple/"}
+
 [workspace]
