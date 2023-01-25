@@ -1,3 +1,5 @@
+use serde::{Serialize, Deserialize}
+
 /// Response status
 pub enum Status {
     Successful,
@@ -24,7 +26,10 @@ fn calc_hash<T: Serialize>(obj: &T) -> Result<String> {
     Ok(digest)
 }
 
-
+pub trait EightFishModel: Serialize {
+    pub fn id(&self) -> String;
+    pub fn calc_hash(&self) -> String;
+}
 
 
 pub struct EightFishResponse {
@@ -40,7 +45,7 @@ fn<T: Serialize> do_serialization(results: Vec<T>) -> String {
 
 
 impl EightFishResponse {
-    pub fn<T: Serialize + CalcHash> new(status: Status, info: Info, aresults: Vec<T>) -> EightFishResponse {
+    pub fn<T: Serialize + EightFishModel> new(status: Status, info: Info, aresults: Vec<T>) -> EightFishResponse {
        
         let mut pair_list;
         let mut results;

@@ -4,40 +4,12 @@ use eightfish::{Module, Request, Response, Result, Router, Status, Info};
 const REDIS_URL_ENV: &str = "REDIS_URL";
 const DB_URL_ENV: &str = "DB_URL";
 
-#[derive(Debug, Clone, Serialize, Deserialize, CalcHash)]
+#[derive(Debug, Clone, Serialize, Deserialize, EightFishModel)]
 pub struct Article {
     id: String,
     title: String,
     content: String,
     authorname: String,
-}
-
-/// for performance
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ArticleHash {
-    item: Article,
-    hash: String,
-}
-
-
-trait IdHashPair {
-    ///
-    fn id(&self) -> String;
-
-    ///
-    fn hash(&self) -> String;
-
-}
-
-impl IdHashPair for ArticleHash {
-    
-    fn id(&self) -> String {
-        self.item.id.to_string()
-    }
-
-    fn hash(&self) -> String {
-        self.hash.to_string()
-    }
 }
 
 pub struct ArticleModule;
