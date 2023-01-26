@@ -1,12 +1,12 @@
 use std::any::Any;
 
-use app::Result;
-use request::EightFishRequest as Request;
-use response::EightFishResponse as Response;
+use crate::app::Result;
+use crate::request::EightFishRequest as Request;
+use crate::response::EightFishResponse as Response;
 
 /// All handlers should implement this Handler trait
 pub trait EightFishHandler: Send + Sync + Any {
-    fn handle(&self, &mut Request) -> Result<Response>;
+    fn handle(&self, req: &mut Request) -> Result<Response>;
 }
 
 impl<F> EightFishHandler for F
@@ -18,7 +18,7 @@ where
     }
 }
 
-impl EightFishHandler for Box<EightFishHandler> {
+impl EightFishHandler for Box<dyn EightFishHandler> {
     fn handle(&self, req: &mut Request) -> Result<Response> {
         (**self).handle(req)
     }

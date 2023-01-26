@@ -11,10 +11,10 @@ mod app;
 pub use app::PathParams;
 pub use app::EightFishApp as App;
 pub use app::GlobalFilter;
-pub use app::EightFishHandler as Handler;
 pub use app::EightFishModule as Module;
 pub use app::EightFishRouter as Router;
 pub use app::{Error, Key, Result};
+pub use handler::EightFishHandler as Handler;
 pub use request::{EightFishRequest as Request, Method};
 pub use response::{EightFishResponse as Response, Status, Info};
 

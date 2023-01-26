@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use request::Method;
-use handler::EightFishHandler;
+use crate::request::Method;
+use crate::handler::EightFishHandler;
 
-type InnerRouter = HashMap<Method, Vec<(&'static str, Arc<Box<EightFishHandler>>)>>;
+type InnerRouter = HashMap<Method, Vec<(&'static str, Arc<Box<dyn EightFishHandler>>)>>;
 
 pub struct EightFishRouter {
     router: InnerRouter,

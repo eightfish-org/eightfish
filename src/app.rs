@@ -1,11 +1,11 @@
 use std::clone::Clone;
 use std::sync::Arc;
 
-//pub use handler::EightFishHandler;
-pub use request::EightFishRequest;
-pub use response::EightFishResponse;
-pub use router::EightFishRouter;
-pub use router_m::Router;
+pub use crate::handler::EightFishHandler;
+pub use crate::request::EightFishRequest;
+pub use crate::response::EightFishResponse;
+pub use crate::router::EightFishRouter;
+pub use crate::router_m::Router;
 pub use typemap::Key;
 
 /// Path parameter type
@@ -35,8 +35,8 @@ pub type Result<T> = ::std::result::Result<T, Error>;
 
 /// GlobalFilter trait, used to place global `before` and `after` middlewares
 pub trait GlobalFilter {
-    fn before(&self, &mut EightFishRequest) -> Result<()>;
-    fn after(&self, &EightFishRequest, &mut EightFishResponse) -> Result<()>;
+    fn before(&self, req: &mut EightFishRequest) -> Result<()>;
+    fn after(&self, req: &EightFishRequest, res: &mut EightFishResponse) -> Result<()>;
 }
 type GlobalFilterType = Box<dyn GlobalFilter + 'static + Send + Sync>;
 type GlobalInitClosure = Box<dyn Fn(&mut EightFishRequest) -> Result<()> + 'static + Send + Sync>;
@@ -55,7 +55,7 @@ pub trait EightFishModule: Sync + Send {
     }
 
     /// module router method, used to write router collection of this module here
-    fn router(&self, &mut EightFishRouter) -> Result<()>;
+    fn router(&self, router: &mut EightFishRouter) -> Result<()>;
 }
 
 
@@ -100,7 +100,7 @@ impl EightFishApp {
     }
 
     // add routers of one module to global router
-    pub fn add_module(&mut self, sm: Box<EightFishModule>) -> &mut Self {
+    pub fn add_module(&mut self, sm: Box<dyn EightFishModule>) -> &mut Self {
         let mut router = EightFishRouter::new();
         // get the sm router
         sm.router(&mut router).unwrap();
@@ -145,13 +145,15 @@ impl EightFishApp {
 
 }
 
-impl Handler for EightFishApp {
+impl EightFishHandler for EightFishApp {
     /// do actual handling for a request
-    fn handle(&self, mut req: EightFishRequest) -> Result<EightFishResponse> {
-        let path = req.path.clone();
+    fn handle(&self, mut req: &mut EightFishRequest) -> Result<EightFishResponse> {
+        let path = req.path().clone();
 
         // pass req to router, execute matched biz handler
         let response = self.router.handle_method(&mut req, &path);
+        response
+/*            
         match response {
             Ok(res) => {
                 Ok(res)
@@ -163,6 +165,8 @@ impl Handler for EightFishApp {
             Err(_) => {
             }
         }
+*/
+
     }
 }
 

@@ -1,6 +1,8 @@
+use std::collections::HashMap;
 use typemap::TypeMap;
 
-pub struct Method {
+#[derive(Eq, Hash, PartialEq, Clone)]
+pub enum Method {
     Get,
     Post,
 }
@@ -25,7 +27,7 @@ impl EightFishRequest {
 
     /// get http method
     pub fn method(&self) -> Method {
-        self.method
+        self.method.clone()
     }
 
     /// get http path
@@ -52,7 +54,7 @@ impl EightFishRequest {
         let mut params: HashMap<String, String> = HashMap::new();
 
         if self.data.is_some() {
-            let _parse = form_urlencoded::parse(&data.as_ref().unwrap().as_bytes());
+            let _parse = form_urlencoded::parse(&self.data.as_ref().unwrap().as_bytes());
             for pair in _parse {
                 let key = pair.0.to_string();
                 let val = pair.1.to_string();

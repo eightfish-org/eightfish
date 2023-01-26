@@ -1,6 +1,8 @@
-use serde::{Serialize, Deserialize}
+use serde::{Serialize, Deserialize};
+use anyhow::Result;
 
 /// Response status
+#[derive(Clone)]
 pub enum Status {
     Successful,
     Failed,
@@ -27,8 +29,8 @@ fn calc_hash<T: Serialize>(obj: &T) -> Result<String> {
 }
 
 pub trait EightFishModel: Serialize {
-    pub fn id(&self) -> String;
-    pub fn calc_hash(&self) -> String;
+    fn id(&self) -> String;
+    fn calc_hash(&self) -> String;
 }
 
 
@@ -39,13 +41,13 @@ pub struct EightFishResponse {
     results: Option<String>,
 }
 
-fn<T: Serialize> do_serialization(results: Vec<T>) -> String {
+fn do_serialization<T: Serialize>(results: Vec<T>) -> String {
     serde_json::to_string(&results).unwrap()
 }
 
 
 impl EightFishResponse {
-    pub fn<T: Serialize + EightFishModel> new(status: Status, info: Info, aresults: Vec<T>) -> EightFishResponse {
+    pub fn new<T: Serialize + EightFishModel>(status: Status, info: Info, aresults: Vec<T>) -> EightFishResponse {
        
         let mut pair_list;
         let mut results;
@@ -54,9 +56,9 @@ impl EightFishResponse {
             pair_list = None;
             results = None;
         } else {
-            let a_pair_list = aresults.map(|&obj| (obj.id(), obj.calc_hash())).collect();
+            let a_pair_list = aresults.iter().map(|obj| (obj.id(), obj.calc_hash())).collect();
             pair_list = Some(a_pair_list);
-            let output = do_serialization(results);
+            let output = do_serialization(aresults);
             results = Some(output);
         }
 
@@ -70,7 +72,7 @@ impl EightFishResponse {
 
     /// get response status
     pub fn status(&self) -> Status {
-        self.status
+        self.status.clone()
     }
 
     /// set response status
@@ -79,8 +81,8 @@ impl EightFishResponse {
     }
 
     /// get response info
-    pub fn info(&self) -> &String {
-        self.info
+    pub fn info(&self) -> &Info {
+        &self.info
     }
 
     /// set response info
@@ -89,7 +91,7 @@ impl EightFishResponse {
     }
 
     /// get response pair_list
-    pub fn pair_list(&self) -> &Option<(String, String)> {
+    pub fn pair_list(&self) -> &Option<Vec<(String, String)>> {
         &self.pair_list
     }
 

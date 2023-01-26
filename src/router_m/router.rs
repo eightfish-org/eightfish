@@ -1,16 +1,12 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use app::Error;
-use app::Key;
-use app::PathParams;
-use app::Result;
-use handler::EightFishHandler;
-use request::{Method, EightFishRequest};
-use response::EightFishResponse;
+use crate::app::{Error, Key, PathParams, Result};
+use crate::handler::EightFishHandler;
+use crate::request::{Method, EightFishRequest};
+use crate::response::EightFishResponse;
 
-use recognizer::Router as Recognizer;
-use recognizer::{Match, Params};
+use crate::recognizer::{Router as Recognizer, Match, Params};
 
 impl Key for PathParams {
     type Value = Params;
@@ -107,7 +103,7 @@ impl Router {
     // }
 
     pub fn handle_method(&self, req: &mut EightFishRequest, path: &str) -> Result<EightFishResponse> {
-        if let Some(matched) = self.recognize(req.method(), path) {
+        if let Some(matched) = self.recognize(&req.method(), path) {
             req.ext_mut().insert::<PathParams>(matched.params);
             matched.handler.handle(req)
         } else {

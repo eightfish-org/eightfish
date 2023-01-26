@@ -91,7 +91,7 @@ impl<'a> Index<&'a str> for Params {
     type Output = String;
     fn index(&self, index: &'a str) -> &String {
         match self.map.get(index) {
-            None => panic!(format!("params[{}] did not exist", index)),
+            None => panic!("{}", format!("params[{}] did not exist", index)),
             Some(s) => s,
         }
     }
