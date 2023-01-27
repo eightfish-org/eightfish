@@ -82,6 +82,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "eightfish"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "eightfish-derive",
+ "form_urlencoded",
+ "json-digest",
+ "serde",
+ "serde_json",
+ "typemap",
+]
+
+[[package]]
+name = "eightfish-derive"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -265,21 +287,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "redis-worker"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bytes",
- "form_urlencoded",
- "json-digest",
- "serde",
- "serde_json",
- "spin-sdk",
- "uuid",
- "wit-bindgen-rust",
-]
-
-[[package]]
 name = "ryu"
 version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -346,6 +353,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "spin-worker"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "eightfish",
+ "form_urlencoded",
+ "json-digest",
+ "serde",
+ "serde_json",
+ "spin-sdk",
+ "wit-bindgen-rust",
+]
+
+[[package]]
 name = "syn"
 version = "1.0.94"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -401,6 +423,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
+name = "traitobject"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "efd1f82c56340fdf16f2a953d7bda4f8fdffba13d93b00844c25572110b26079"
+
+[[package]]
+name = "typemap"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "653be63c80a3296da5551e1bfd2cca35227e13cdd08c6668903ae2f4f77aa1f6"
+dependencies = [
+ "unsafe-any",
+]
+
+[[package]]
 name = "unicase"
 version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -431,25 +468,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ccb82d61f80a663efe1f787a51b16b5a51e3314d6ac365b08639f52387b33f3"
 
 [[package]]
-name = "uuid"
-version = "1.2.0"
+name = "unsafe-any"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "683f0a095f6dcf74520a5f17a12452ae6f970abbd2443299a1e226fd38195f2b"
+checksum = "f30360d7979f5e9c6e6cea48af192ea8fab4afb3cf72597154b8f08935bc9c7f"
 dependencies = [
- "getrandom",
- "rand",
- "uuid-macro-internal",
-]
-
-[[package]]
-name = "uuid-macro-internal"
-version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c3f75df58084e24253a2e525ec649daf853ef3d451ad5466b0f71317c536f5d"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
+ "traitobject",
 ]
 
 [[package]]

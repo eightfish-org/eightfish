@@ -11,10 +11,10 @@ pub enum Status {
 /// Response info
 #[derive(Default)]
 pub struct Info {
-    model_name: String,
-    action: String,
-    target: String,
-    extra: String,
+    pub model_name: String,
+    pub action: String,
+    pub target: String,
+    pub extra: String,
 }
 
 // code put here temporarily, this func would be put into the eightfish-derive crate to 
