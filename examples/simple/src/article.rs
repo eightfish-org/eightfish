@@ -36,9 +36,9 @@ impl ArticleModule {
     fn get_one(req: &mut Request) -> Result<Response> {
         let pg_addr = std::env::var(DB_URL_ENV).unwrap();
 
-        let params = req.parse_urlencoded().unwrap();
+        let params = req.parse_urlencoded();
 
-        let article_id = params.get("id")?;
+        let article_id = params.get("id").unwrap();
         // construct a sql statement 
         let query_string = format!("select id, title, content, author from article where id='{article_id}'");
         let rowset = pg::query(&pg_addr, &query_string, &vec![]).unwrap();
@@ -79,11 +79,11 @@ impl ArticleModule {
 
         let pg_addr = std::env::var(DB_URL_ENV).unwrap();
 
-        let params = req.parse_urlencoded().unwrap();
+        let params = req.parse_urlencoded();
 
-        let title = params.get("title")?;
-        let content = params.get("content")?;
-        let authorname = params.get("authorname")?;
+        let title = params.get("title").unwrap();
+        let content = params.get("content").unwrap();
+        let authorname = params.get("authorname").unwrap();
 
         let id = Uuid::new_v4().simple().to_string(); // uuid
 
@@ -118,12 +118,12 @@ impl ArticleModule {
 
         let pg_addr = std::env::var(DB_URL_ENV).unwrap();
 
-        let params = req.parse_urlencoded().unwrap();
+        let params = req.parse_urlencoded();
 
-        let id = params.get("id")?;
-        let title = params.get("title")?;
-        let content = params.get("content")?;
-        let authorname = params.get("authorname")?;
+        let id = params.get("id").unwrap();
+        let title = params.get("title").unwrap();
+        let content = params.get("content").unwrap();
+        let authorname = params.get("authorname").unwrap();
 
         // construct a struct
         let article = Article {
@@ -155,9 +155,9 @@ impl ArticleModule {
     fn delete(req: &mut Request) -> Result<Response> {
         let pg_addr = std::env::var(DB_URL_ENV).unwrap();
 
-        let params = req.parse_urlencoded().unwrap();
+        let params = req.parse_urlencoded();
 
-        let id = params.get("id")?;
+        let id = params.get("id").unwrap();
 
         // construct a sql statement 
         let sql_string = format!("delete article where id='{id}'");
