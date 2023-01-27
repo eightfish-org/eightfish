@@ -16,6 +16,6 @@ pub use app::EightFishRouter as Router;
 pub use app::{Error, Key, Result};
 pub use handler::EightFishHandler as Handler;
 pub use request::{EightFishRequest as Request, Method};
-pub use response::{EightFishResponse as Response, Status, Info};
+pub use response::{EightFishResponse as Response, Status, Info, EightFishModel};
 
 pub use recognizer::Params as RecognizerParams;
