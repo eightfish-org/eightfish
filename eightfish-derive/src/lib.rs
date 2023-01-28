@@ -1,9 +1,8 @@
 use proc_macro::{self, TokenStream};
 use quote::quote;
-//use syn::{parse_macro_input, DeriveInput};
-use syn::{parse_macro_input, DataEnum, DataUnion, DeriveInput, FieldsNamed, FieldsUnnamed};
+use syn::{parse_macro_input, DeriveInput, FieldsNamed};
 
-#[proc_macro_derive(EightFishHelper)]
+#[proc_macro_derive(EightFishModel)]
 pub fn derive(input: TokenStream) -> TokenStream {
     let DeriveInput { ident, data, .. } = parse_macro_input!(input);
 
@@ -11,10 +10,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
         syn::Data::Struct(ref s) => match s.fields {
             syn::Fields::Named(FieldsNamed { ref named, .. }) => {
                 let idents = named.iter().map(|f| &f.ident);
-                format!(
-                    "{}",
-                    quote! {#(#idents),*}
-                )
+                format!("{}", quote! {#(#idents),*})
             }
             _ => unimplemented!(),
         },
@@ -24,14 +20,13 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let field_placeholders = match data {
         syn::Data::Struct(ref s) => match s.fields {
             syn::Fields::Named(FieldsNamed { ref named, .. }) => {
-                let mut placeholders: Vec<String> = 
-                    named.iter().enumerate().map(|(i, _)| (i + 1).to_string()).collect::<Vec<String>>();
-                placeholders.push(placeholders.len().to_string());
-                
-                format!(
-                    "{}",
-                    quote! {#($#placeholders),*}
-                )
+                let placeholders: Vec<String> = named
+                    .iter()
+                    .enumerate()
+                    .map(|(i, _)| (i + 1).to_string())
+                    .collect::<Vec<String>>();
+
+                format!("{}", quote! {#($#placeholders),*})
             }
             _ => unimplemented!(),
         },
@@ -53,7 +48,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let orders = match data {
         syn::Data::Struct(ref s) => match s.fields {
             syn::Fields::Named(FieldsNamed { ref named, .. }) => {
-                named.iter().enumerate().map(|(i, _)| i+1)
+                named.iter().enumerate().map(|(i, _)| i + 1)
             }
             _ => unimplemented!(),
         },
@@ -94,15 +89,4 @@ pub fn derive(input: TokenStream) -> TokenStream {
     };
 
     output.into()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
 }
