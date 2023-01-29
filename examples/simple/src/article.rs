@@ -1,33 +1,18 @@
-use eightfish::{Module, Request, Response, Result, Router, Status, Info, EightFishModel};
-use serde::{Serialize, Deserialize};
-use spin_sdk::{
-    pg::{self, Decode},
-};
+use eightfish::{EightFishModel, Info, Module, Request, Response, Result, Router, Status};
+use eightfish_derive::EightFishModel;
+use serde::{Deserialize, Serialize};
+use spin_sdk::pg::{self, Decode, ParameterValue};
 use uuid::Uuid;
 
 const REDIS_URL_ENV: &str = "REDIS_URL";
 const DB_URL_ENV: &str = "DB_URL";
 
-//#[derive(Debug, Clone, Serialize, Deserialize, EightFishModel)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, EightFishModel, Default)]
 pub struct Article {
     id: String,
     title: String,
     content: String,
     authorname: String,
-}
-
-impl EightFishModel for Article {
-    fn id(&self) -> String {
-        self.id.clone()
-    }
-
-    fn calc_hash(&self) -> String {
-        let json_val= serde_json::to_value(self).unwrap();
-        let digest = json_digest::digest_data(&json_val).unwrap();
-
-        digest
-    }
 }
 
 pub struct ArticleModule;
@@ -39,9 +24,12 @@ impl ArticleModule {
         let params = req.parse_urlencoded();
 
         let article_id = params.get("id").unwrap();
-        // construct a sql statement 
-        let query_string = format!("select id, title, content, author from article where id='{article_id}'");
-        let rowset = pg::query(&pg_addr, &query_string, &vec![]).unwrap();
+        let fields = Article::field_names();
+        let table = Article::model_name();
+        let params = vec![ParameterValue::Str(article_id.as_str())];
+        // construct a sql statement
+        let query_string = format!("SELECT {fields} FROM {table} WHERE id = ?");
+        let rowset = pg::query(&pg_addr, &query_string, &params).unwrap();
 
         // convert the raw vec[u8] to every rust struct filed, and convert the whole into a
         // rust struct vec, later we may find a gerneral type converter way
@@ -76,7 +64,6 @@ impl ArticleModule {
     }
 
     fn new(req: &mut Request) -> Result<Response> {
-
         let pg_addr = std::env::var(DB_URL_ENV).unwrap();
 
         let params = req.parse_urlencoded();
@@ -94,10 +81,18 @@ impl ArticleModule {
             content: content.clone(),
             authorname: authorname.clone(),
         };
-
-        // construct a sql statement 
-        let sql_string = format!("insert into article values ({}, {}, {}, {})", article.id, article.title, article.content, article.authorname);
-        let _execute_results = pg::execute(&pg_addr, &sql_string, &vec![]);
+        let fields = Article::field_names();
+        let fields_placeholder = Article::row_placeholders();
+        let table = Article::model_name();
+        let params = vec![
+            ParameterValue::Str(article.id.as_str()),
+            ParameterValue::Str(article.title.as_str()),
+            ParameterValue::Str(article.content.as_str()),
+            ParameterValue::Str(article.authorname.as_str()),
+        ];
+        // construct a sql statement
+        let sql_string = format!("INSERT INTO {table}({fields}) VALUES ({fields_placeholder})");
+        let _execute_results = pg::execute(&pg_addr, &sql_string, &params);
 
         let mut results: Vec<Article> = vec![];
         results.push(article);
@@ -115,7 +110,6 @@ impl ArticleModule {
     }
 
     fn update(req: &mut Request) -> Result<Response> {
-
         let pg_addr = std::env::var(DB_URL_ENV).unwrap();
 
         let params = req.parse_urlencoded();
@@ -132,10 +126,17 @@ impl ArticleModule {
             content: content.clone(),
             authorname: authorname.clone(),
         };
-
-        // construct a sql statement 
-        let sql_string = format!("update article set id='{}', title='{}', content='{}', authorname='{}' where id='{id}'", article.id, article.title, article.content, article.authorname);
-        let _execute_results = pg::execute(&pg_addr, &sql_string, &vec![]);
+        let table = Article::model_name();
+        let update_filed_placeholder = Article::update_placeholders();
+        let params = vec![
+            ParameterValue::Str(article.title.as_str()),
+            ParameterValue::Str(article.content.as_str()),
+            ParameterValue::Str(article.authorname.as_str()),
+            ParameterValue::Str(article.id.as_str()),
+        ];
+        // construct a sql statement
+        let sql_string = format!("UPDATE {table} SET {update_filed_placeholder} WHERE id = ?");
+        let _execute_results = pg::execute(&pg_addr, &sql_string, &params);
 
         let mut results: Vec<Article> = vec![];
         results.push(article);
@@ -158,10 +159,11 @@ impl ArticleModule {
         let params = req.parse_urlencoded();
 
         let id = params.get("id").unwrap();
-
-        // construct a sql statement 
-        let sql_string = format!("delete article where id='{id}'");
-        let _execute_results = pg::execute(&pg_addr, &sql_string, &vec![]);
+        let params = vec![ParameterValue::Str(id.as_str())];
+        let table = Article::model_name();
+        // construct a sql statement
+        let sql_string = format!("DELETE {table} WHERE id = ?");
+        let _execute_results = pg::execute(&pg_addr, &sql_string, &params);
         // TODO check the pg result
 
         let results: Vec<Article> = vec![];
@@ -190,4 +192,3 @@ impl Module for ArticleModule {
         Ok(())
     }
 }
-

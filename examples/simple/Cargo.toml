@@ -21,6 +21,7 @@ serde_json = { version = '1.0', default-features = false, features = ['alloc'] }
 json-digest = "0.0.16"
 
 eightfish = {path = "../../"}
+eightfish-derive = {path = "../../eightfish-derive"}
 spin_worker = { path = "../../spin_worker" }
 
 [dependencies.uuid]
