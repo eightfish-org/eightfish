@@ -1,3 +1,4 @@
+use eightfish::EightFishModel;
 use proc_macro::{self, TokenStream};
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, FieldsNamed};
@@ -23,10 +24,27 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 let placeholders: Vec<String> = named
                     .iter()
                     .enumerate()
-                    .map(|(i, _)| (i + 1).to_string())
+                    .map(|(i, _)| "?".to_string())
                     .collect::<Vec<String>>();
 
-                format!("{}", quote! {#($#placeholders),*})
+                format!("{}", quote! {#(#placeholders),*})
+            }
+            _ => unimplemented!(),
+        },
+        _ => unimplemented!(),
+    };
+
+    let update_field_placeholders = match data {
+        syn::Data::Struct(ref s) => match s.fields {
+            syn::Fields::Named(FieldsNamed { ref named, .. }) => {
+                let placeholders: Vec<String> = named
+                    .iter()
+                    .map(|f| &f.ident)
+                    .filter_map(|ident| Some(ident.clone().unwrap().to_string()))
+                    .map(|ident| format!("{} = ?", ident))
+                    .collect::<Vec<String>>();
+
+                format!("{}", quote! {#(#placeholders),*})
             }
             _ => unimplemented!(),
         },
@@ -54,11 +72,17 @@ pub fn derive(input: TokenStream) -> TokenStream {
         },
         _ => unimplemented!(),
     };
-
+    let ident_string = ident.to_string();
     let output = quote! {
         impl #ident {
+            fn model_name() -> String {
+                #ident_string.to_string().to_lowercase()
+            }
             fn field_names() -> String {
                 format!("{}", #field_names)
+            }
+            fn update_placeholders() -> String {
+                #update_field_placeholders.to_string().replace("\"", "")
             }
             fn row_placeholders() -> String {
                 #field_placeholders.to_string().replace("\"", "")
@@ -85,7 +109,8 @@ pub fn derive(input: TokenStream) -> TokenStream {
             fn get_hash_from_row(row: Vec<String>) -> String {
                 row[0].to_string()
             }
-
+        }
+        impl EightFishModel for #ident {
             fn id(&self) -> String {
                 self.id.clone()
             }

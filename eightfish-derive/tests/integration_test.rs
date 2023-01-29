@@ -1,10 +1,17 @@
+use eightfish::EightFishModel;
 use eightfish_derive::EightFishModel;
 use serde::{Deserialize, Serialize};
+
 #[derive(Default, EightFishModel, PartialEq, Debug, Serialize, Deserialize)]
 struct Foo {
     id: String,
     title: String,
     content: String,
+}
+
+#[test]
+fn test_model_names() {
+    assert_eq!("foo", Foo::model_name());
 }
 
 #[test]
@@ -43,7 +50,12 @@ fn test_calc_hash() {
 
 #[test]
 fn test_struct_names_placeholder() {
-    assert_eq!("$1, $2, $3", Foo::row_placeholders());
+    assert_eq!("?, ?, ?", Foo::row_placeholders());
+}
+
+#[test]
+fn test_struct_names_update_placeholder() {
+    assert_eq!("id = ?, title = ?, content = ?", Foo::update_placeholders());
 }
 
 #[test]
