@@ -85,6 +85,16 @@ pub fn derive(input: TokenStream) -> TokenStream {
             fn get_hash_from_row(row: Vec<String>) -> String {
                 row[0].to_string()
             }
+
+            fn id(&self) -> String {
+                self.id.clone()
+            }
+
+            fn calc_hash(&self) -> String {
+                let json_val= serde_json::to_value(self).unwrap();
+                let digest = json_digest::digest_data(&json_val).unwrap();
+                digest
+            }
         }
     };
 

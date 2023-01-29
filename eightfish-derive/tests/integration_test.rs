@@ -1,5 +1,6 @@
 use eightfish_derive::EightFishModel;
-#[derive(Default, EightFishModel, PartialEq, Debug)]
+use serde::{Deserialize, Serialize};
+#[derive(Default, EightFishModel, PartialEq, Debug, Serialize, Deserialize)]
 struct Foo {
     id: String,
     title: String,
@@ -9,6 +10,35 @@ struct Foo {
 #[test]
 fn test_struct_names() {
     assert_eq!("id, title, content", Foo::field_names());
+}
+
+#[test]
+fn test_get_id() {
+    let id = "id".to_string();
+    let title = "my blog".to_string();
+    let content = "blog content".to_string();
+    let f = Foo {
+        id: id.clone(),
+        title: title.clone(),
+        content: content.clone(),
+    };
+    assert_eq!("id".to_string(), f.id());
+}
+
+#[test]
+fn test_calc_hash() {
+    let id = "id".to_string();
+    let title = "my blog".to_string();
+    let content = "blog content".to_string();
+    let f = Foo {
+        id: id.clone(),
+        title: title.clone(),
+        content: content.clone(),
+    };
+    assert_eq!(
+        "cjuOl837GfI9V1rYe2iJZw9a5cLae_QiWWLoYL7-IXgLNA".to_string(),
+        f.calc_hash()
+    );
 }
 
 #[test]
