@@ -28,7 +28,7 @@ impl ArticleModule {
         let table = Article::model_name();
         let params = vec![ParameterValue::Str(article_id.as_str())];
         // construct a sql statement
-        let query_string = format!("SELECT {fields} FROM {table} WHERE id = ?");
+        let query_string = format!("SELECT {fields} FROM {table} WHERE id = $1");
         let rowset = pg::query(&pg_addr, &query_string, &params).unwrap();
 
         // convert the raw vec[u8] to every rust struct filed, and convert the whole into a
@@ -135,7 +135,7 @@ impl ArticleModule {
             ParameterValue::Str(article.id.as_str()),
         ];
         // construct a sql statement
-        let sql_string = format!("UPDATE {table} SET {update_filed_placeholder} WHERE id = ?");
+        let sql_string = format!("UPDATE {table} SET {update_filed_placeholder} WHERE id = $1");
         let _execute_results = pg::execute(&pg_addr, &sql_string, &params);
 
         let mut results: Vec<Article> = vec![];
@@ -162,7 +162,7 @@ impl ArticleModule {
         let params = vec![ParameterValue::Str(id.as_str())];
         let table = Article::model_name();
         // construct a sql statement
-        let sql_string = format!("DELETE {table} WHERE id = ?");
+        let sql_string = format!("DELETE {table} WHERE id = $1");
         let _execute_results = pg::execute(&pg_addr, &sql_string, &params);
         // TODO check the pg result
 

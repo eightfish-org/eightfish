@@ -24,10 +24,10 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 let placeholders: Vec<String> = named
                     .iter()
                     .enumerate()
-                    .map(|(i, _)| "?".to_string())
+                    .map(|(i, _)| (i + 1).to_string())
                     .collect::<Vec<String>>();
 
-                format!("{}", quote! {#(#placeholders),*})
+                format!("{}", quote! {#($#placeholders),*})
             }
             _ => unimplemented!(),
         },
@@ -41,7 +41,8 @@ pub fn derive(input: TokenStream) -> TokenStream {
                     .iter()
                     .map(|f| &f.ident)
                     .filter_map(|ident| Some(ident.clone().unwrap().to_string()))
-                    .map(|ident| format!("{} = ?", ident))
+                    .enumerate()
+                    .map(|(i, ident)| format!("{} = ${}", ident, i + 2))
                     .collect::<Vec<String>>();
 
                 format!("{}", quote! {#(#placeholders),*})

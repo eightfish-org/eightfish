@@ -50,12 +50,15 @@ fn test_calc_hash() {
 
 #[test]
 fn test_struct_names_placeholder() {
-    assert_eq!("?, ?, ?", Foo::row_placeholders());
+    assert_eq!("$1, $2, $3", Foo::row_placeholders());
 }
 
 #[test]
 fn test_struct_names_update_placeholder() {
-    assert_eq!("id = ?, title = ?, content = ?", Foo::update_placeholders());
+    assert_eq!(
+        "id = $2, title = $3, content = $4",
+        Foo::update_placeholders()
+    );
 }
 
 #[test]
