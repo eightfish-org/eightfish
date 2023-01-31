@@ -50,6 +50,39 @@ fn test_update_sql() {
 fn test_delete_sql() {
     assert_eq!("DELETE FROM foo WHERE id = $1", Foo::delete_sql());
 }
+
+#[test]
+fn test_build_insert_param() {
+    let id = "id".to_string();
+    let title = "my blog".to_string();
+    let content = "blog content".to_string();
+    let f = Foo {
+        id: id.clone(),
+        title: title.clone(),
+        content: content.clone(),
+    };
+    assert_eq!(
+        vec!["id", "my blog", "blog content"],
+        f.build_insert_param()
+    );
+}
+
+#[test]
+fn test_build_update_param() {
+    let id = "id".to_string();
+    let title = "my blog".to_string();
+    let content = "blog content".to_string();
+    let f = Foo {
+        id: id.clone(),
+        title: title.clone(),
+        content: content.clone(),
+    };
+    assert_eq!(
+        vec!["id", "my blog", "blog content"],
+        f.build_update_param()
+    );
+}
+
 #[test]
 fn test_get_id() {
     let id = "id".to_string();

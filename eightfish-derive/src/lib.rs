@@ -63,7 +63,8 @@ pub fn derive(input: TokenStream) -> TokenStream {
         _ => unimplemented!(),
     };
     let idents2 = idents.clone();
-
+    let idents3 = idents.clone();
+    let idents4 = idents.clone();
     let orders = match data {
         syn::Data::Struct(ref s) => match s.fields {
             syn::Fields::Named(FieldsNamed { ref named, .. }) => {
@@ -124,6 +125,20 @@ pub fn derive(input: TokenStream) -> TokenStream {
             }
             fn delete_sql() -> String {
                 format!("DELETE FROM {} WHERE id = $1", #ident_string.to_string().to_lowercase())
+            }
+            fn build_insert_param(&self) -> Vec<String> {
+                let mut param_vec: Vec<String> = Vec::new();
+                #(
+                    param_vec.push(self.#idents3.to_string());
+                )*
+                param_vec
+            }
+            fn build_update_param(&self) -> Vec<String> {
+                let mut param_vec: Vec<String> = Vec::new();
+                #(
+                    param_vec.push(self.#idents4.to_string());
+                )*
+                param_vec
             }
         }
         impl EightFishModel for #ident {

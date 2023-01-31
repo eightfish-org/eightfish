@@ -24,26 +24,16 @@ impl ArticleModule {
         let params = req.parse_urlencoded();
 
         let article_id = params.get("id").unwrap();
-        let params = vec![ParameterValue::Str(article_id.as_str())];
+
         // construct a sql statement
         let query_string = Article::get_all_sql();
+        let params = vec![ParameterValue::Str(article_id.as_str())];
         let rowset = pg::query(&pg_addr, &query_string, &params).unwrap();
 
         // convert the raw vec[u8] to every rust struct filed, and convert the whole into a
         // rust struct vec, later we may find a gerneral type converter way
         let mut results: Vec<Article> = vec![];
         for row in rowset.rows {
-            // let id = String::decode(&row[0]).unwrap();
-            // let title = String::decode(&row[1]).unwrap();
-            // let content = String::decode(&row[2]).unwrap();
-            // let authorname = String::decode(&row[3]).unwrap();
-
-            // let article = Article {
-            //     id,
-            //     title,
-            //     content,
-            //     authorname,
-            // };
             let row_string = row
                 .iter()
                 .map(|c| String::decode(c).unwrap())
@@ -84,14 +74,13 @@ impl ArticleModule {
             authorname: authorname.clone(),
         };
 
-        let params = vec![
-            ParameterValue::Str(article.id.as_str()),
-            ParameterValue::Str(article.title.as_str()),
-            ParameterValue::Str(article.content.as_str()),
-            ParameterValue::Str(article.authorname.as_str()),
-        ];
         // construct a sql statement
         let sql_string = Article::insert_sql();
+        let string_params = article.build_insert_param();
+        let params = string_params
+            .iter()
+            .map(|param| ParameterValue::Str(param.as_str()))
+            .collect::<Vec<ParameterValue>>();
         let _execute_results = pg::execute(&pg_addr, &sql_string, &params);
 
         let mut results: Vec<Article> = vec![];
@@ -127,14 +116,13 @@ impl ArticleModule {
             authorname: authorname.clone(),
         };
 
-        let params = vec![
-            ParameterValue::Str(article.title.as_str()),
-            ParameterValue::Str(article.content.as_str()),
-            ParameterValue::Str(article.authorname.as_str()),
-            ParameterValue::Str(article.id.as_str()),
-        ];
         // construct a sql statement
         let sql_string = Article::update_sql();
+        let string_params = article.build_update_param();
+        let params = string_params
+            .iter()
+            .map(|param| ParameterValue::Str(param.as_str()))
+            .collect::<Vec<ParameterValue>>();
         let _execute_results = pg::execute(&pg_addr, &sql_string, &params);
 
         let mut results: Vec<Article> = vec![];
@@ -158,9 +146,10 @@ impl ArticleModule {
         let params = req.parse_urlencoded();
 
         let id = params.get("id").unwrap();
-        let params = vec![ParameterValue::Str(id.as_str())];
+
         // construct a sql statement
-        let sql_string = Article::delete_sql(); //format!("DELETE {table} WHERE id = $1");
+        let sql_string = Article::delete_sql();
+        let params = vec![ParameterValue::Str(id.as_str())];
         let _execute_results = pg::execute(&pg_addr, &sql_string, &params);
         // TODO check the pg result
 
