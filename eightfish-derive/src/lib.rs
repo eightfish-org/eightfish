@@ -110,6 +110,21 @@ pub fn derive(input: TokenStream) -> TokenStream {
             fn get_hash_from_row(row: Vec<String>) -> String {
                 row[0].to_string()
             }
+            fn get_one_sql() -> String {
+                format!("SELECT {} FROM {} WHERE id = $1", #field_names, #ident_string.to_string().to_lowercase())
+            }
+            fn get_all_sql() -> String {
+                format!("SELECT {} FROM {}", #field_names, #ident_string.to_string().to_lowercase())
+            }
+            fn insert_sql() -> String {
+                format!("INSERT INTO {}({}) VALUES ({})", #ident_string.to_string().to_lowercase(), #field_names, #field_placeholders.to_string().replace("\"", ""))
+            }
+            fn update_sql() -> String {
+                format!("UPDATE {} SET {} WHERE id = $1", #ident_string.to_string().to_lowercase(), #update_field_placeholders.to_string().replace("\"", ""))
+            }
+            fn delete_sql() -> String {
+                format!("DELETE FROM {} WHERE id = $1", #ident_string.to_string().to_lowercase())
+            }
         }
         impl EightFishModel for #ident {
             fn id(&self) -> String {

@@ -18,7 +18,38 @@ fn test_model_names() {
 fn test_struct_names() {
     assert_eq!("id, title, content", Foo::field_names());
 }
+#[test]
+fn test_get_one_sql() {
+    assert_eq!(
+        "SELECT id, title, content FROM foo WHERE id = $1",
+        Foo::get_one_sql()
+    );
+}
 
+#[test]
+fn test_get_all_sql() {
+    assert_eq!("SELECT id, title, content FROM foo", Foo::get_all_sql());
+}
+
+#[test]
+fn test_insert_sql() {
+    assert_eq!(
+        "INSERT INTO foo(id, title, content) VALUES ($1, $2, $3)",
+        Foo::insert_sql()
+    );
+}
+
+#[test]
+fn test_update_sql() {
+    assert_eq!(
+        "UPDATE foo SET id = $2, title = $3, content = $4 WHERE id = $1",
+        Foo::update_sql()
+    );
+}
+#[test]
+fn test_delete_sql() {
+    assert_eq!("DELETE FROM foo WHERE id = $1", Foo::delete_sql());
+}
 #[test]
 fn test_get_id() {
     let id = "id".to_string();
