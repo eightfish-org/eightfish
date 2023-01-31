@@ -26,7 +26,7 @@ impl ArticleModule {
         let article_id = params.get("id").unwrap();
 
         // construct a sql statement
-        let query_string = Article::get_all_sql();
+        let query_string = Article::get_one_sql();
         let params = vec![ParameterValue::Str(article_id.as_str())];
         let rowset = pg::query(&pg_addr, &query_string, &params).unwrap();
 
