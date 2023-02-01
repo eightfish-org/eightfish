@@ -98,15 +98,15 @@ pub mod pallet {
             // Write the id-hash pair into each StorageMap, according to the model name
             ModelIdHashDoubleMap::<T>::set(model.clone(), id.clone(), hash.clone());
 
-            let action = "index_update".as_bytes().to_vec();
-            let mut payload: Payload = Vec::new();
-            payload.extend_from_slice(&reqid);
-            payload.push(b':');
-            payload.extend_from_slice(&id);
-            payload.push(b':');
-            payload.extend_from_slice(&hash);
+            let action = "update_index".as_bytes().to_vec();
+            //let mut payload: Payload = Vec::new();
+            //payload.extend_from_slice(&reqid);
+            //payload.push(b':');
+            //payload.extend_from_slice(&id);
+            //payload.push(b':');
+            //payload.extend_from_slice(&hash);
 
-			Self::deposit_event(Event::IndexUpdated(who, model, action, payload, block_time));
+			Self::deposit_event(Event::IndexUpdated(who, model, action, reqid, block_time));
 			Ok(())
 		}
 

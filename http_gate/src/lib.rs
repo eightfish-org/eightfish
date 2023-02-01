@@ -1,6 +1,6 @@
 #![allow(unused_assignments)]
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use spin_sdk::{
     http::{Request, Response,},
     http_component, redis
@@ -10,11 +10,12 @@ use serde_json::json;
 use uuid::Uuid;
 use bytes::Bytes;
 
-const REDIS_ADDRESS_ENV: &str = "REDIS_ADDRESS";
+const REDIS_ADDRESS_ENV: &str = "REDIS_URL";
 
 /// A simple Spin HTTP component.
 #[http_component]
 fn http_gate(req: Request) -> Result<Response> {
+    println!("req: {:?}", req);
 
     let redis_addr= std::env::var(REDIS_ADDRESS_ENV)?;
     
@@ -63,12 +64,13 @@ fn http_gate(req: Request) -> Result<Response> {
     // XXX: 
 
     // use a unique way to generate a reqid
-    let reqid = Uuid::new_v4();
+    let reqid = Uuid::new_v4().simple().to_string();
 
     let payload = json!({
-        "reqid": reqid.simple().to_string(),
+        "reqid": reqid,
         "reqdata": reqdata,
     });
+    println!("payload: {:?}", payload);
 
     // construct a json, serialize it and send to a redis channel
     // model and action, we can plan a scheme to parse them out
@@ -89,42 +91,44 @@ fn http_gate(req: Request) -> Result<Response> {
         _ = redis::publish(&redis_addr, "proxy2spin", &serde_json::to_vec(&json_to_send).unwrap());
     }
 
+    let mut loop_count = 1;
     loop {
-        let mut loop_count = 1;
         // loop the redis cache key of this procedure request
-        let result = redis::get(&redis_addr, &format!("reqid:{reqid}"));
-            //.map_err(|_| anyhow!("Error querying Redis"))?;
-        match result {
-            Ok(raw_result) => {
-                // Now we get the raw serialized result from worker, we suppose it use
-                // JSON spec to serialized it, so we can directly pass it back
-                // to user's response body.
-                // clear the redis cache key of the worker result
-                // TODO: add del command to host function, pr to spin
-                //let _ = redis::del(&redis_addr, &format!("reqid:{reqid}"));
+        let result = redis::get(&redis_addr, &format!("cache:{reqid}"))
+            .map_err(|_| anyhow!("Error querying Redis"))?;
+        // TODO: check the cache:status::{reqid} for the processing status flag
+        //println!("check result: {:?}", result);
+        if result.is_empty() {
+            // after 6 seconds, timeout
+            if loop_count < 2000 {
+                // if not get the result, sleep for a little period
+                let ten_millis = std::time::Duration::from_millis(10);
+                std::thread::sleep(ten_millis);
+                loop_count += 1;
 
-                // jump out this loop, and return the response to user
+                //println!("loop continue {}...", loop_count);
+            }
+            else {
+                println!("timeout, return 500");
+                // timeout handler, use which http status code?
                 return Ok(http::Response::builder()
-                          .status(200)
-                          .header("openforum_version", "0.1")
-                          .body(Some(Bytes::from(raw_result)))?);
+                          .status(500)
+                          .body(Some("No data".into()))?);
+            }
+        } else {
+            // Now we get the raw serialized result from worker, we suppose it use
+            // JSON spec to serialized it, so we can directly pass it back
+            // to user's response body.
+            // clear the redis cache key of the worker result
+            // TODO: add del command to host function, pr to spin
+            let _ = redis::del(&redis_addr, &[&format!("cache:{reqid}")]);
 
-            }
-            Err(_) => {
-                // after 6 seconds, timeout
-                if loop_count < 600 {
-                    // if not get the result, sleep for a little period
-                    let ten_millis = std::time::Duration::from_millis(10);
-                    std::thread::sleep(ten_millis);
-                    loop_count += 1;
-                }
-                else {
-                    // timeout handler, use which http status code?
-                    return Ok(http::Response::builder()
-                              .status(500)
-                              .body(Some("No data".into()))?);
-                }
-            }
+            // jump out this loop, and return the response to user
+            return Ok(http::Response::builder()
+                      .status(200)
+                      .header("eightfish_version", "0.1")
+                      .body(Some(Bytes::from(result)))?);
+
         }
     }
 }

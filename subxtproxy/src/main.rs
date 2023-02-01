@@ -5,6 +5,7 @@ use sp_keyring::AccountKeyring;
 use subxt::{
     tx::PairSigner,
     OnlineClient,
+    PolkadotConfig,
     SubstrateConfig,
 };
 use subxt::rpc::{ rpc_params, RpcParams };
@@ -27,7 +28,7 @@ pub struct InputOutputObject {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Payload {
     reqid: String,
-    reqdata: Vec<(String, String)>,
+    reqdata: Option<Vec<(String, String)>>,
 }
 
 #[subxt::subxt(runtime_metadata_path = "metadata.scale")]
@@ -46,7 +47,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let task_subxt = tokio::task::spawn(async move {
 
-        let api = OnlineClient::<SubstrateConfig>::new().await?;
+        //let api = OnlineClient::<SubstrateConfig>::new().await?;
+        let api = OnlineClient::<PolkadotConfig>::new().await?;
 
         let mut of_events = api.events().subscribe().await?.filter_events::<(
             substrate::eight_fish_module::events::Action,
@@ -112,7 +114,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Get a instance of subxt to send transactions to substrate
         let signer = PairSigner::new(AccountKeyring::Alice.pair());
-        let api = OnlineClient::<SubstrateConfig>::new().await.unwrap();
+        let api = OnlineClient::<PolkadotConfig>::new().await.unwrap();
 
         loop {
             let msg = pubsub_stream.next().await;
@@ -122,30 +124,39 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let msg_obj: InputOutputObject = serde_json::from_slice(&msg_payload).unwrap();
 
             if &msg_obj.action== "post" {
+                println!("from redis: post: {:?}", msg_obj);
                 // construct act tx
                 let tx = substrate::tx()
                     .eight_fish_module()
-                    .act(msg_obj.model.as_bytes().to_vec(), msg_obj.action.as_bytes().to_vec(), msg_obj.data);
+                    .act(msg_obj.model.as_bytes().to_vec(), 
+                         msg_obj.action.as_bytes().to_vec(), 
+                         msg_obj.data);
 
                 // Submit the transaction with default params:
                 let _hash = api.tx().sign_and_submit_default(&tx, &signer).await.unwrap();
-
             } else if &msg_obj.action == "update_index" {
+                println!("from redis: update_index: {:?}", msg_obj);
                 // XXX: here, msg_obj.data contains reqid and reqdata
                 // we need to extract the .data to an Payload struct in substrate pallet?
                 // call update_index method
                 let payload: Payload = serde_json::from_slice(&msg_obj.data).unwrap();
-                let (id, hash) = payload.reqdata[0].clone();
+                println!("from redis: update_index: payload: {:?}", payload);
+                let reqid = payload.reqid.clone();
+                let data = payload.reqdata.clone().unwrap();
+                let (id, hash) = &data[0];
 
                 let tx = substrate::tx()
                     .eight_fish_module()
-                    .update_index(msg_obj.model.as_bytes().to_vec(), payload.reqid.as_bytes().to_vec(), id.as_bytes().to_vec(), hash.as_bytes().to_vec());
+                    .update_index(msg_obj.model.as_bytes().to_vec(), 
+                                  reqid.as_bytes().to_vec(), 
+                                  id.as_bytes().to_vec(), 
+                                  hash.as_bytes().to_vec());
 
                 let _hash = api.tx().sign_and_submit_default(&tx, &signer).await.unwrap();
 
             } else if &msg_obj.action== "check_pair_list" {
+                println!("from redis: check_pair_list: {:?}", msg_obj);
                 // send rpc request to query the check result
-
                 // XXX: here, msg_obj.data contains reqid and reqdata
                 let payload: Payload = serde_json::from_slice(&msg_obj.data).unwrap();
 
@@ -172,6 +183,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 redis_conn1.publish("proxy2spin", output_string).await?;
 
             } else if &msg_obj.action== "check_new_version_wasmfile" {
+                println!("from redis: check_new_version_wasmfile: {:?}", msg_obj);
 
                 let wasmfile_new_flag = substrate::storage().eight_fish_module().wasm_file_new_flag();
                 let new_flag: Option<bool> = api.storage().fetch(&wasmfile_new_flag, None).await.unwrap();
@@ -190,6 +202,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
 
             } else if &msg_obj.action== "retreive_wasmfile" {
+                println!("from redis: retreive_wasmfile: {:?}", msg_obj);
 
                 let wasmfile= substrate::storage().eight_fish_module().wasm_file();
                 let wasmfile_content: Option<Vec<u8>> = api.storage().fetch(&wasmfile, None).await.unwrap();
@@ -209,6 +222,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
 
             } else if &msg_obj.action== "disable_wasm_upgrade_flag" {
+                println!("from redis: disable_wasm_upgrade_flag: {:?}", msg_obj);
 
                 let tx = substrate::tx()
                     .eight_fish_module()

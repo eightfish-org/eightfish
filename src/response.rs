@@ -2,14 +2,14 @@ use serde::{Serialize, Deserialize};
 use anyhow::Result;
 
 /// Response status
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Status {
     Successful,
     Failed,
 }
 
 /// Response info
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Info {
     pub model_name: String,
     pub action: String,
@@ -34,6 +34,7 @@ pub trait EightFishModel: Serialize {
 }
 
 
+#[derive(Debug)]
 pub struct EightFishResponse {
     status: Status,
     info: Info,

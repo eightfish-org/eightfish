@@ -8,6 +8,7 @@ version = "0.1.0"
 [[component]]
 id = "http-gate"
 source = "target/wasm32-wasi/release/http_gate.wasm"
+environment = {REDIS_URL = "redis://127.0.0.1:6379"}
 [component.trigger]
 route = "/..."
 [component.build]

@@ -18,9 +18,9 @@ use eightfish::{
 
 const REDIS_URL_ENV: &str = "REDIS_URL";
 const DB_URL_ENV: &str = "DB_URL";
-const TMP_CACHE_RESULTS: &str = "tmp:cache:{#}";
-const CACHE_STATUS_RESULTS: &str = "cache:status:{#}";
-const CACHE_RESULTS: &str = "cache:{#}";
+const TMP_CACHE_RESULTS: &str = "tmp:cache:#";
+const CACHE_STATUS_RESULTS: &str = "cache:status:#";
+const CACHE_RESULTS: &str = "cache:#";
 const CHANNEL_SPIN2PROXY: &str = "spin2proxy";
 
 
@@ -52,6 +52,7 @@ impl Worker {
     pub fn work(self, message: Bytes) -> Result<()> {
 
         let msg_obj: InputOutputObject = serde_json::from_slice(&message)?;
+        println!("Worker::work: msg_obj: {:?}", msg_obj);
 
         match &msg_obj.action[..] {
             "query" => {
@@ -90,14 +91,17 @@ impl Worker {
                 let reqdata = payload.reqdata.to_owned();
 
                 let mut ef_req = EightFishRequest::new(method, path, reqdata);
+                println!("Worker::work: in post branch: ef_req");
 
                 let ef_res = self.app.handle(&mut ef_req);
                 if ef_res.is_err() {
                     return Err(anyhow!("fooo post"));
                 }
+                println!("Worker::work: in post branch: ef_res: {:?}", ef_res);
                 let ef_res = ef_res.unwrap();
 
                 let pair_list = inner_stuffs_on_post_result(&ef_res).unwrap();
+                println!("Worker::work: in post branch: pair_list: {:?}", pair_list);
 
                 let modelname = ef_res.info().model_name.to_owned();
 
@@ -107,10 +111,13 @@ impl Worker {
                 // Callback: handle the result of the update_index call event
                 // the format of the msg_obj.data is: reqid:id:hash
                 // and msg.model is model, msg.action is action
-                let v: Vec<&str> = std::str::from_utf8(&msg_obj.data).unwrap().split(':').collect();
-                let reqid = &v[0];
-                let id = &v[1];
-                let hash = &v[2];
+                //let v: Vec<&str> = std::str::from_utf8(&msg_obj.data).unwrap().split(':').collect();
+                //println!("index_update callback: v: {:?}", v);
+                //let reqid = &v[0];
+                //let id = &v[1];
+                //let hash = &v[2];
+                let reqid = std::str::from_utf8(&msg_obj.data).unwrap();
+                println!("callback: update_index: reqid: {:?}", reqid);
                 
                 // while getting the index updated callback, we put result http_gate wants into redis
                 // cache
@@ -118,7 +125,7 @@ impl Worker {
                 let cache_key = CACHE_STATUS_RESULTS.replace('#', &reqid);
                 _ = redis::set(&redis_addr, &cache_key, b"true");
                 let cache_key = CACHE_RESULTS.replace('#', &reqid);
-                _ = redis::set(&redis_addr, &cache_key, &(id.to_string() + ":" + hash).as_bytes()); 
+                _ = redis::set(&redis_addr, &cache_key, b"{'result: 'Ok'}"); 
 
             }
             "check_pair_list" => {
@@ -163,7 +170,7 @@ impl Worker {
 fn tail_query_process(redis_addr: &str, reqid: &str, modelname: &str, pair_list: &Vec<(String, String)>) {
     let payload = json!({
         "reqid": reqid,
-        "reqdata": pair_list,
+        "reqdata": Some(pair_list),
     });
     // XXX: here, maybe it's better to put check_pair_list value to action field
     let json_to_send = json!({
@@ -180,8 +187,9 @@ fn tail_query_process(redis_addr: &str, reqid: &str, modelname: &str, pair_list:
 fn tail_post_process(redis_addr: &str, reqid: &str, modelname: &str, pair_list: &Vec<(String, String)>) {
     let payload = json!({
         "reqid": reqid,
-        "reqdata": pair_list,
+        "reqdata": Some(pair_list),
     });
+    println!("tail_post_process: payload: {:?}", payload);
 
     let json_to_send = json!({
         "model": modelname,
@@ -190,6 +198,7 @@ fn tail_post_process(redis_addr: &str, reqid: &str, modelname: &str, pair_list: 
         "time": 0
     });
 
+    println!("tail_post_process: json_to_send: {:?}", json_to_send);
     _ = redis::publish(&redis_addr, CHANNEL_SPIN2PROXY, &json_to_send.to_string().as_bytes());
 
 }
@@ -249,18 +258,21 @@ fn inner_stuffs_on_post_result(res: &EightFishResponse) -> Result<Vec<(String, S
     }
 
     if action == "new"{
-        let sql_string = format!("insert into {table_name}_idhash values ({}, {})", id, ins_hash);
+        let sql_string = format!("insert into {table_name}_idhash values ('{}', '{}')", id, ins_hash);
         let _execute_results = pg::execute(&pg_addr, &sql_string, &vec![]);
         // TODO: check the pg result
+        println!("in post stuff: new: _execute_results: {:?}", _execute_results);
 
     } else if action == "update" {
-        let sql_string = format!("update {table_name}_idhash set hash={ins_hash} where id='{id}'");
+        let sql_string = format!("update {table_name}_idhash set hash='{ins_hash}' where id='{id}'");
         let _execute_results = pg::execute(&pg_addr, &sql_string, &vec![]);
+        println!("in post stuff: update: _execute_results: {:?}", _execute_results);
 
     } else if action == "delete" {
         let sql_string = format!("delete {table_name}_idhash where id='{id}'");
         let _execute_results = pg::execute(&pg_addr, &sql_string, &vec![]);
         // TODO: check the pg result
+        println!("in post stuff: delete: _execute_results: {:?}", _execute_results);
     }
     else {
 

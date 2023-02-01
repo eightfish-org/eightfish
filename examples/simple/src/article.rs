@@ -96,8 +96,9 @@ impl ArticleModule {
         };
 
         // construct a sql statement 
-        let sql_string = format!("insert into article values ({}, {}, {}, {})", article.id, article.title, article.content, article.authorname);
+        let sql_string = format!("insert into article values ('{}', '{}', '{}', '{}')", article.id, article.title, article.content, article.authorname);
         let _execute_results = pg::execute(&pg_addr, &sql_string, &vec![]);
+        println!("in handler article_new: _execute_results: {:?}", _execute_results);
 
         let mut results: Vec<Article> = vec![];
         results.push(article);
