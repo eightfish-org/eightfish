@@ -27,37 +27,13 @@ pub struct InputOutputObject {
 }
 
 
-type PairList = Vec<(String, String)>;
+type PairList = Vec<(Vec<u8>, Vec<u8>)>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Payload {
     reqid: String,
     reqdata: Option<PairList>,
 }
-
-/*
-impl fmt::Display for PairList {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut output = String::new();
-        for (id, hash) in self {
-            output.push_str(&id);
-            output.push_str(",");
-            output.push_str(&hash);
-            output.push_str(",");
-        }
-        if output.len() > 0 {
-            output = output.truncate(output.len() - 1);
-        }
-        write!(f, "{}", output)
-    }
-}
-*/
-
-fn to_hex(bytes: impl AsRef<[u8]>) -> String {
-    format!("0x{}", hex::encode(bytes.as_ref()))
-}
-
-
 
 #[subxt::subxt(runtime_metadata_path = "metadata.scale")]
 pub mod substrate {}
@@ -187,8 +163,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .eight_fish_module()
                     .update_index(msg_obj.model.as_bytes().to_vec(), 
                                   reqid.as_bytes().to_vec(), 
-                                  id.as_bytes().to_vec(), 
-                                  hash.as_bytes().to_vec());
+                                  id, 
+                                  hash;
 
                 let _hash = api.tx().sign_and_submit_default(&tx, &signer).await.unwrap();
 
@@ -198,31 +174,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // XXX: here, msg_obj.data contains reqid and reqdata
                 let payload: Payload = serde_json::from_slice(&msg_obj.data).unwrap();
                 println!("from redis: check_pair_list: payload: {:?}", payload);
-                let model = msg_obj.model.clone();
-                let reqdata = payload.reqdata.clone().unwrap();
-                //println!("check_pair_list: reqdata.to_string(): {:?}", reqdata.to_string());
-                /*
-                let mut output = String::new();
-                for (id, hash) in reqdata {
-                    output.push_str(&id);
-                    output.push_str(",");
-                    output.push_str(&hash);
-                    output.push_str(",");
-                }
-                if output.len() > 0 {
-                    output.truncate(output.len() - 1);
-                }
-                */
-                let pair_list: PairList = reqdata.iter().map(|(id, hash)| (to_hex(id.as_bytes()), hash.clone())).collect();
+                let model = msg_obj.model.clone().as_bytes().to_vec();
+                let pair_list = payload.reqdata.clone().unwrap();
 
-                let params: RpcParams = rpc_params![to_hex(model.as_bytes()), pair_list];
-                //let mut params = RpcParams::new();
-                //params.push(hex::encode(&msg_obj.model.clone())).unwrap();
-                //params.push(hex::encode(&output)).unwrap();
+                let params: RpcParams = rpc_params![None::<sp_core::H256>, model, pair_list];
 
                 let check_boolean: bool = api
                     .rpc()
-                    //.eightfish_checkPairList(model, reqdata)
                     .request("eightfish_checkPairList", params)
                     .await.unwrap();
 

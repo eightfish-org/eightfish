@@ -2759,6 +2759,7 @@ dependencies = [
  "redis",
  "serde",
  "serde_json",
+ "sp-core",
  "sp-keyring",
  "subxt",
  "tokio 1.19.2",
