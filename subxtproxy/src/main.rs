@@ -1,4 +1,5 @@
 #![allow(unreachable_code)]
+use std::fmt;
 use futures::StreamExt;
 use sp_keyring::AccountKeyring;
 //use std::time::Duration;
@@ -25,11 +26,38 @@ pub struct InputOutputObject {
     time: u64,
 }
 
+
+type PairList = Vec<(String, String)>;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Payload {
     reqid: String,
-    reqdata: Option<Vec<(String, String)>>,
+    reqdata: Option<PairList>,
 }
+
+/*
+impl fmt::Display for PairList {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut output = String::new();
+        for (id, hash) in self {
+            output.push_str(&id);
+            output.push_str(",");
+            output.push_str(&hash);
+            output.push_str(",");
+        }
+        if output.len() > 0 {
+            output = output.truncate(output.len() - 1);
+        }
+        write!(f, "{}", output)
+    }
+}
+*/
+
+fn to_hex(bytes: impl AsRef<[u8]>) -> String {
+    format!("0x{}", hex::encode(bytes.as_ref()))
+}
+
+
 
 #[subxt::subxt(runtime_metadata_path = "metadata.scale")]
 pub mod substrate {}
@@ -169,18 +197,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // send rpc request to query the check result
                 // XXX: here, msg_obj.data contains reqid and reqdata
                 let payload: Payload = serde_json::from_slice(&msg_obj.data).unwrap();
+                println!("from redis: check_pair_list: payload: {:?}", payload);
+                let model = msg_obj.model.clone();
+                let reqdata = payload.reqdata.clone().unwrap();
+                //println!("check_pair_list: reqdata.to_string(): {:?}", reqdata.to_string());
+                /*
+                let mut output = String::new();
+                for (id, hash) in reqdata {
+                    output.push_str(&id);
+                    output.push_str(",");
+                    output.push_str(&hash);
+                    output.push_str(",");
+                }
+                if output.len() > 0 {
+                    output.truncate(output.len() - 1);
+                }
+                */
+                let pair_list: PairList = reqdata.iter().map(|(id, hash)| (to_hex(id.as_bytes()), hash.clone())).collect();
 
-                let params: RpcParams = rpc_params![&msg_obj.model, &payload.reqdata];
+                let params: RpcParams = rpc_params![to_hex(model.as_bytes()), pair_list];
+                //let mut params = RpcParams::new();
+                //params.push(hex::encode(&msg_obj.model.clone())).unwrap();
+                //params.push(hex::encode(&output)).unwrap();
+
                 let check_boolean: bool = api
                     .rpc()
-                    //.check_pair_list(&msg_obj.model, &payload.reqdata)
-                    .request("check_pair_list", params)
+                    //.eightfish_checkPairList(model, reqdata)
+                    .request("eightfish_checkPairList", params)
                     .await.unwrap();
 
                 let ret_payload = json!({
                     "reqid": payload.reqid,
                     "reqdata": Some(check_boolean.to_string()),
                 });
+                println!("from redis: check_pair_list: ret_payload: {:?}", ret_payload);
 
                 // send packet back to the spin runtime
                 let output = InputOutputObject {

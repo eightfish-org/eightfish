@@ -65,15 +65,18 @@ impl Worker {
                 let reqdata = payload.reqdata.to_owned();
 
                 let mut ef_req = EightFishRequest::new(method, path, reqdata);
+                println!("Worker::work: in query branch: ef_req");
 
                 let ef_res = self.app.handle(&mut ef_req);
                 if ef_res.is_err() {
                     return Err(anyhow!("fooo get"));
                 }
                 let ef_res = ef_res.unwrap();
+                println!("Worker::work: in query branch: ef_res: {:?}", ef_res);
 
                 // we check the intermediate result  in the framework internal 
                 let pair_list = inner_stuffs_on_query_result(&reqid, &ef_res).unwrap();
+                println!("Worker::work: in query branch: pair_list: {:?}", pair_list);
 
                 let modelname = ef_res.info().model_name.to_owned();
                 // we can retrieve the model name from the path
@@ -179,6 +182,8 @@ fn tail_query_process(redis_addr: &str, reqid: &str, modelname: &str, pair_list:
         "reqid": reqid,
         "reqdata": Some(pair_list),
     });
+
+    println!("tail_query_process: payload: {:?}", payload);
     // XXX: here, maybe it's better to put check_pair_list value to action field
     let json_to_send = json!({
         "model": modelname,
@@ -205,7 +210,6 @@ fn tail_post_process(redis_addr: &str, reqid: &str, modelname: &str, pair_list: 
         "time": 0
     });
 
-    println!("tail_post_process: json_to_send: {:?}", json_to_send);
     _ = redis::publish(&redis_addr, CHANNEL_SPIN2PROXY, &json_to_send.to_string().as_bytes());
 
 }
@@ -217,10 +221,11 @@ fn inner_stuffs_on_query_result(reqid: &str, res: &EightFishResponse) -> Result<
     let table_name = &res.info().model_name;
     let pair_list = res.pair_list().clone().unwrap();
     // get the id list from obj list
-    let ids: Vec<String> = pair_list.iter().map(|(id, hash)| id.to_owned()).collect();
+    let ids: Vec<String> = pair_list.iter().map(|(id, hash)| String::new() + "'" + &id + "'").collect();
     let ids_string = ids.join(",");
 
     let query_string = format!("select id, hash from {table_name}_idhash where id in ({ids_string})");
+    println!("query_string: {:?}", query_string);
     let rowset = pg::query(&pg_addr, &query_string, &vec![]).unwrap();
 
     let mut idhash_map: HashMap<String, String> = HashMap::new();
@@ -234,11 +239,13 @@ fn inner_stuffs_on_query_result(reqid: &str, res: &EightFishResponse) -> Result<
     // iterate on the input results to check
     for (id, chash) in pair_list.iter() {
         let hash_from_map = idhash_map.get(&id[..]).expect("");
+        println!("chash, hash_from_map: {:?}, {:?}", chash, hash_from_map);
         if chash != hash_from_map {
             return Err(anyhow!("Hash mismatching.".to_string()));
         }
     }
 
+    println!("res.results: {:?}", res.results());
     // store to cache for http gate to retrieve
     let data_to_cache = res.results().clone().unwrap_or("".to_string());
     _ = redis::set(&redis_addr, &TMP_CACHE_RESULTS.replace('#', &reqid), &data_to_cache.as_bytes());

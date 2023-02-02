@@ -13,7 +13,7 @@ use eightfish_runtime_api::EightFishApi as EightFishRuntimeApi;
 
 #[rpc(client, server)]
 pub trait EightFishRpc<BlockHash> {
-    #[method(name = "eightfish_check_pair_list")]
+    #[method(name = "eightfish_checkPairList")]
 	fn check_pair_list(&self, 
                        at: Option<BlockHash>,
                        model: Vec<u8>, 

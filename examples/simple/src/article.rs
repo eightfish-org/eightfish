@@ -37,11 +37,13 @@ impl ArticleModule {
         let pg_addr = std::env::var(DB_URL_ENV).unwrap();
 
         let params = req.parse_urlencoded();
+        println!("in handler article: params: {:?}", params);
 
         let article_id = params.get("id").unwrap();
         // construct a sql statement 
-        let query_string = format!("select id, title, content, author from article where id='{article_id}'");
+        let query_string = format!("select id, title, content, authorname from article where id='{article_id}'");
         let rowset = pg::query(&pg_addr, &query_string, &vec![]).unwrap();
+        println!("in handler article: rowset: {:?}", rowset);
 
         // convert the raw vec[u8] to every rust struct filed, and convert the whole into a
         // rust struct vec, later we may find a gerneral type converter way
@@ -62,6 +64,7 @@ impl ArticleModule {
 
             results.push(article);
         }
+        println!("in handler article: results: {:?}", results);
 
         let info = Info {
             model_name: "article".to_string(),
