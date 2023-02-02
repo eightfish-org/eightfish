@@ -99,14 +99,14 @@ pub mod pallet {
             ModelIdHashDoubleMap::<T>::set(model.clone(), id.clone(), hash.clone());
 
             let action = "update_index".as_bytes().to_vec();
-            //let mut payload: Payload = Vec::new();
-            //payload.extend_from_slice(&reqid);
-            //payload.push(b':');
-            //payload.extend_from_slice(&id);
+            let mut payload: Vec<u8> = Vec::new();
+            payload.extend_from_slice(&reqid);
+            payload.push(b':');
+            payload.extend_from_slice(&id);
             //payload.push(b':');
             //payload.extend_from_slice(&hash);
 
-			Self::deposit_event(Event::IndexUpdated(who, model, action, reqid, block_time));
+			Self::deposit_event(Event::IndexUpdated(who, model, action, payload, block_time));
 			Ok(())
 		}
 

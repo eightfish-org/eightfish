@@ -85,13 +85,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 let model = String::from_utf8(ev.1.clone()).unwrap();
                 let action = String::from_utf8(ev.2.clone()).unwrap();
-                let data = ev.3.clone();
+                let data = String::from_utf8(ev.3.clone()).unwrap();
                 let time = ev.4;
+
+                let v: Vec<&str> = data.split(':').collect();
+                println!("IndexUpdated event: v: {:?}", v);
+                let reqid = &v[0];
+                let id = &v[1];
+
+                let payload = json!({
+                    "reqid": reqid,
+                    "reqdata": Some(id),
+                });
 
                 let output = InputOutputObject {
                     model,
                     action,
-                    data,
+                    data: payload.to_string().as_bytes().to_vec(),
                     time,
                 };
 

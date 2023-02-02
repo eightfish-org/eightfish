@@ -116,8 +116,15 @@ impl Worker {
                 //let reqid = &v[0];
                 //let id = &v[1];
                 //let hash = &v[2];
-                let reqid = std::str::from_utf8(&msg_obj.data).unwrap();
-                println!("callback: update_index: reqid: {:?}", reqid);
+                let payload: Payload = serde_json::from_slice(&msg_obj.data)?;
+                println!("callback: update_index: payload: {:?}", payload);
+                let reqid = payload.reqid.to_owned();
+                let id = payload.reqdata.to_owned().unwrap();
+
+                let result = json!({
+                    "result": "Ok",
+                    "id": id,
+                });
                 
                 // while getting the index updated callback, we put result http_gate wants into redis
                 // cache
@@ -125,7 +132,7 @@ impl Worker {
                 let cache_key = CACHE_STATUS_RESULTS.replace('#', &reqid);
                 _ = redis::set(&redis_addr, &cache_key, b"true");
                 let cache_key = CACHE_RESULTS.replace('#', &reqid);
-                _ = redis::set(&redis_addr, &cache_key, b"{'result: 'Ok'}"); 
+                _ = redis::set(&redis_addr, &cache_key, &result.to_string().as_bytes()); 
 
             }
             "check_pair_list" => {
