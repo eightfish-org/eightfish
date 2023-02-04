@@ -1,7 +1,7 @@
 use eightfish::EightFishModel;
 use eightfish_derive::EightFishModel;
 use serde::{Deserialize, Serialize};
-
+use spin_sdk::pg::ParameterValue;
 #[derive(Default, EightFishModel, PartialEq, Debug, Serialize, Deserialize)]
 struct Foo {
     id: String,
@@ -61,10 +61,18 @@ fn test_build_insert_param() {
         title: title.clone(),
         content: content.clone(),
     };
-    assert_eq!(
-        vec!["id", "my blog", "blog content"],
-        f.build_insert_param()
-    );
+    let params = f.build_insert_param();
+    let params_str = params
+        .iter()
+        .map(|p| {
+            if let ParameterValue::Str(s) = p {
+                format!("{}", s)
+            } else {
+                format!("{}", "None")
+            }
+        })
+        .collect::<Vec<String>>();
+    assert_eq!(vec!["id", "my blog", "blog content"], params_str);
 }
 
 #[test]
@@ -77,10 +85,18 @@ fn test_build_update_param() {
         title: title.clone(),
         content: content.clone(),
     };
-    assert_eq!(
-        vec!["id", "my blog", "blog content"],
-        f.build_update_param()
-    );
+    let params = f.build_update_param();
+    let params_str = params
+        .iter()
+        .map(|p| {
+            if let ParameterValue::Str(s) = p {
+                format!("{}", s)
+            } else {
+                format!("{}", "None")
+            }
+        })
+        .collect::<Vec<String>>();
+    assert_eq!(vec!["id", "my blog", "blog content"], params_str);
 }
 
 #[test]

@@ -76,12 +76,8 @@ impl ArticleModule {
 
         // construct a sql statement
         let sql_string = Article::insert_sql();
-        let string_params = article.build_insert_param();
-        let params = string_params
-            .iter()
-            .map(|param| ParameterValue::Str(param.as_str()))
-            .collect::<Vec<ParameterValue>>();
-        let _execute_results = pg::execute(&pg_addr, &sql_string, &params);
+        let sql_params = article.build_insert_param();
+        let _execute_results = pg::execute(&pg_addr, &sql_string, &sql_params);
 
         let mut results: Vec<Article> = vec![];
         results.push(article);
@@ -118,12 +114,8 @@ impl ArticleModule {
 
         // construct a sql statement
         let sql_string = Article::update_sql();
-        let string_params = article.build_update_param();
-        let params = string_params
-            .iter()
-            .map(|param| ParameterValue::Str(param.as_str()))
-            .collect::<Vec<ParameterValue>>();
-        let _execute_results = pg::execute(&pg_addr, &sql_string, &params);
+        let sql_params = article.build_update_param();
+        let _execute_results = pg::execute(&pg_addr, &sql_string, &sql_params);
 
         let mut results: Vec<Article> = vec![];
         results.push(article);

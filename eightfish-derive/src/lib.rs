@@ -1,8 +1,6 @@
-use eightfish::EightFishModel;
 use proc_macro::{self, TokenStream};
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, FieldsNamed};
-
 #[proc_macro_derive(EightFishModel)]
 pub fn derive(input: TokenStream) -> TokenStream {
     let DeriveInput { ident, data, .. } = parse_macro_input!(input);
@@ -126,17 +124,17 @@ pub fn derive(input: TokenStream) -> TokenStream {
             fn delete_sql() -> String {
                 format!("DELETE FROM {} WHERE id = $1", #ident_string.to_string().to_lowercase())
             }
-            fn build_insert_param(&self) -> Vec<String> {
-                let mut param_vec: Vec<String> = Vec::new();
+            fn build_insert_param(&self) -> Vec<ParameterValue> {
+                let mut param_vec: Vec<ParameterValue> = Vec::new();
                 #(
-                    param_vec.push(self.#idents3.to_string());
+                    param_vec.push( ParameterValue::Str(self.#idents3.as_str()));
                 )*
                 param_vec
             }
-            fn build_update_param(&self) -> Vec<String> {
-                let mut param_vec: Vec<String> = Vec::new();
+            fn build_update_param(&self) -> Vec<ParameterValue> {
+                let mut param_vec: Vec<ParameterValue> = Vec::new();
                 #(
-                    param_vec.push(self.#idents4.to_string());
+                    param_vec.push(ParameterValue::Str(self.#idents4.as_str()));
                 )*
                 param_vec
             }

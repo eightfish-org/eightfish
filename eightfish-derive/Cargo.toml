@@ -14,4 +14,7 @@ syn = { version = "1.0", features = ["full"] }
 serde = { version = '1.0', default-features = false, features = ['derive'] }
 serde_json = { version = '1.0', default-features = false, features = ['alloc'] }
 json-digest = "0.0.16"
+
+[dev-dependencies]
 eightfish = {path = "../"}
+spin-sdk = { path = "../../spin/sdk/rust" }
