@@ -1,33 +1,18 @@
-use eightfish::{Module, Request, Response, Result, Router, Status, Info, EightFishModel};
-use serde::{Serialize, Deserialize};
-use spin_sdk::{
-    pg::{self, Decode},
-};
+use eightfish::{EightFishModel, Info, Module, Request, Response, Result, Router, Status};
+use eightfish_derive::EightFishModel;
+use serde::{Deserialize, Serialize};
+use spin_sdk::pg::{self, Decode, ParameterValue};
 use uuid::Uuid;
 
 const REDIS_URL_ENV: &str = "REDIS_URL";
 const DB_URL_ENV: &str = "DB_URL";
 
-//#[derive(Debug, Clone, Serialize, Deserialize, EightFishModel)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, EightFishModel, Default)]
 pub struct Article {
     id: String,
     title: String,
     content: String,
     authorname: String,
-}
-
-impl EightFishModel for Article {
-    fn id(&self) -> String {
-        self.id.clone()
-    }
-
-    fn calc_hash(&self) -> String {
-        let json_val= serde_json::to_value(self).unwrap();
-        let digest = json_digest::digest_data(&json_val).unwrap();
-
-        digest
-    }
 }
 
 pub struct ArticleModule;
@@ -40,27 +25,22 @@ impl ArticleModule {
         println!("in handler article: params: {:?}", params);
 
         let article_id = params.get("id").unwrap();
-        // construct a sql statement 
-        let query_string = format!("select id, title, content, authorname from article where id='{article_id}'");
-        let rowset = pg::query(&pg_addr, &query_string, &vec![]).unwrap();
+
+        // construct a sql statement
+        let sql_statement = Article::get_one_sql();
+        let sql_params = vec![ParameterValue::Str(article_id.as_str())];
+        let rowset = pg::query(&pg_addr, &sql_statement, &sql_params).unwrap();
         println!("in handler article: rowset: {:?}", rowset);
 
         // convert the raw vec[u8] to every rust struct filed, and convert the whole into a
         // rust struct vec, later we may find a gerneral type converter way
         let mut results: Vec<Article> = vec![];
         for row in rowset.rows {
-            let id = String::decode(&row[0]).unwrap();
-            let title = String::decode(&row[1]).unwrap();
-            let content = String::decode(&row[2]).unwrap();
-            let authorname = String::decode(&row[3]).unwrap();
-
-            let article = Article {
-                id,
-                title,
-                content,
-                authorname,
-            };
-            //let article = Article::from_row(&row);
+            let row_string = row
+                .iter()
+                .map(|c| String::decode(c).unwrap())
+                .collect::<Vec<String>>();
+            let article = Article::from_row(row_string);
 
             results.push(article);
         }
@@ -79,7 +59,6 @@ impl ArticleModule {
     }
 
     fn new(req: &mut Request) -> Result<Response> {
-
         let pg_addr = std::env::var(DB_URL_ENV).unwrap();
 
         let params = req.parse_urlencoded();
@@ -98,10 +77,13 @@ impl ArticleModule {
             authorname: authorname.clone(),
         };
 
-        // construct a sql statement 
-        let sql_string = format!("insert into article values ('{}', '{}', '{}', '{}')", article.id, article.title, article.content, article.authorname);
-        let _execute_results = pg::execute(&pg_addr, &sql_string, &vec![]);
-        println!("in handler article_new: _execute_results: {:?}", _execute_results);
+        // construct a sql statement and param
+        let (sql_statement, sql_params) = article.build_sql_insert();
+        let _execute_results = pg::execute(&pg_addr, &sql_statement, &sql_params);
+        println!(
+            "in handler article_new: _execute_results: {:?}",
+            _execute_results
+        );
 
         let mut results: Vec<Article> = vec![];
         results.push(article);
@@ -119,7 +101,6 @@ impl ArticleModule {
     }
 
     fn update(req: &mut Request) -> Result<Response> {
-
         let pg_addr = std::env::var(DB_URL_ENV).unwrap();
 
         let params = req.parse_urlencoded();
@@ -137,9 +118,9 @@ impl ArticleModule {
             authorname: authorname.clone(),
         };
 
-        // construct a sql statement 
-        let sql_string = format!("update article set id='{}', title='{}', content='{}', authorname='{}' where id='{id}'", article.id, article.title, article.content, article.authorname);
-        let _execute_results = pg::execute(&pg_addr, &sql_string, &vec![]);
+        // construct a sql statement and params
+        let (sql_statement, sql_params) = article.build_sql_update();
+        let _execute_results = pg::execute(&pg_addr, &sql_statement, &sql_params);
 
         let mut results: Vec<Article> = vec![];
         results.push(article);
@@ -163,9 +144,10 @@ impl ArticleModule {
 
         let id = params.get("id").unwrap();
 
-        // construct a sql statement 
-        let sql_string = format!("delete article where id='{id}'");
-        let _execute_results = pg::execute(&pg_addr, &sql_string, &vec![]);
+        // construct a sql statement
+        let sql_statement = Article::delete_sql();
+        let sql_params = vec![ParameterValue::Str(id.as_str())];
+        let _execute_results = pg::execute(&pg_addr, &sql_statement, &sql_params);
         // TODO check the pg result
 
         let results: Vec<Article> = vec![];
@@ -194,4 +176,3 @@ impl Module for ArticleModule {
         Ok(())
     }
 }
-

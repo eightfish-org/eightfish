@@ -86,7 +86,6 @@ name = "eightfish"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "eightfish-derive",
  "form_urlencoded",
  "json-digest",
  "serde",
@@ -98,8 +97,11 @@ dependencies = [
 name = "eightfish-derive"
 version = "0.1.0"
 dependencies = [
+ "json-digest",
  "proc-macro2",
  "quote",
+ "serde",
+ "serde_json",
  "syn",
 ]
 
@@ -331,6 +333,7 @@ dependencies = [
  "anyhow",
  "bytes",
  "eightfish",
+ "eightfish-derive",
  "form_urlencoded",
  "json-digest",
  "serde",

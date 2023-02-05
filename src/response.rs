@@ -1,5 +1,5 @@
-use serde::{Serialize, Deserialize};
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 
 /// Response status
 #[derive(Clone, Debug)]
@@ -17,22 +17,10 @@ pub struct Info {
     pub extra: String,
 }
 
-// code put here temporarily, this func would be put into the eightfish-derive crate to 
-// implemented on struct
-fn calc_hash<T: Serialize>(obj: &T) -> Result<String> {
-    // I think we can use json_digest to do the deterministic hash calculating
-    // https://docs.rs/json-digest/0.0.16/json_digest/
-    let json_val= serde_json::to_value(obj).unwrap();
-    let digest = json_digest::digest_data(&json_val).unwrap();
-
-    Ok(digest)
-}
-
 pub trait EightFishModel: Serialize {
     fn id(&self) -> String;
     fn calc_hash(&self) -> String;
 }
-
 
 #[derive(Debug)]
 pub struct EightFishResponse {
@@ -46,10 +34,12 @@ fn do_serialization<T: Serialize>(results: Vec<T>) -> String {
     serde_json::to_string(&results).unwrap()
 }
 
-
 impl EightFishResponse {
-    pub fn new<T: Serialize + EightFishModel>(status: Status, info: Info, aresults: Vec<T>) -> EightFishResponse {
-       
+    pub fn new<T: Serialize + EightFishModel>(
+        status: Status,
+        info: Info,
+        aresults: Vec<T>,
+    ) -> EightFishResponse {
         let mut pair_list;
         let mut results;
 
@@ -57,7 +47,10 @@ impl EightFishResponse {
             pair_list = None;
             results = None;
         } else {
-            let a_pair_list = aresults.iter().map(|obj| (obj.id(), obj.calc_hash())).collect();
+            let a_pair_list = aresults
+                .iter()
+                .map(|obj| (obj.id(), obj.calc_hash()))
+                .collect();
             pair_list = Some(a_pair_list);
             let output = do_serialization(aresults);
             results = Some(output);
@@ -105,5 +98,4 @@ impl EightFishResponse {
     pub fn set_results(&mut self, results: Option<String>) {
         self.results = results;
     }
-
 }
