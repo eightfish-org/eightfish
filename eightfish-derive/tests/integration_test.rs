@@ -98,6 +98,62 @@ fn test_build_update_param() {
         .collect::<Vec<String>>();
     assert_eq!(vec!["id", "my blog", "blog content"], params_str);
 }
+#[test]
+fn test_build_sql_insert() {
+    let id = "id".to_string();
+    let title = "my blog".to_string();
+    let content = "blog content".to_string();
+    let f = Foo {
+        id: id.clone(),
+        title: title.clone(),
+        content: content.clone(),
+    };
+    let (statement, params) = f.build_sql_insert();
+    let params_str = params
+        .iter()
+        .map(|p| {
+            if let ParameterValue::Str(s) = p {
+                format!("{}", s)
+            } else {
+                format!("{}", "None")
+            }
+        })
+        .collect::<Vec<String>>();
+    assert_eq!(
+        "INSERT INTO foo(id, title, content) VALUES ($1, $2, $3)",
+        statement
+    );
+    assert_eq!(vec!["id", "my blog", "blog content"], params_str);
+}
+
+#[test]
+fn test_build_sql_update() {
+    let id = "id".to_string();
+    let title = "my blog".to_string();
+    let content = "blog content".to_string();
+    let f = Foo {
+        id: id.clone(),
+        title: title.clone(),
+        content: content.clone(),
+    };
+    let (statement, params) = f.build_sql_update();
+    let params_str = params
+        .iter()
+        .map(|p| {
+            if let ParameterValue::Str(s) = p {
+                format!("{}", s)
+            } else {
+                format!("{}", "None")
+            }
+        })
+        .collect::<Vec<String>>();
+
+    assert_eq!(
+        "UPDATE foo SET id = $2, title = $3, content = $4 WHERE id = $1",
+        statement
+    );
+    assert_eq!(vec!["id", "my blog", "blog content"], params_str);
+}
 
 #[test]
 fn test_get_id() {

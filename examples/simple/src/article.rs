@@ -26,9 +26,9 @@ impl ArticleModule {
         let article_id = params.get("id").unwrap();
 
         // construct a sql statement
-        let query_string = Article::get_one_sql();
-        let params = vec![ParameterValue::Str(article_id.as_str())];
-        let rowset = pg::query(&pg_addr, &query_string, &params).unwrap();
+        let sql_statement = Article::get_one_sql();
+        let sql_params = vec![ParameterValue::Str(article_id.as_str())];;
+        let rowset = pg::query(&pg_addr, &sql_statement, &sql_params).unwrap();
 
         // convert the raw vec[u8] to every rust struct filed, and convert the whole into a
         // rust struct vec, later we may find a gerneral type converter way
@@ -74,10 +74,9 @@ impl ArticleModule {
             authorname: authorname.clone(),
         };
 
-        // construct a sql statement
-        let sql_string = Article::insert_sql();
-        let sql_params = article.build_insert_param();
-        let _execute_results = pg::execute(&pg_addr, &sql_string, &sql_params);
+        // construct a sql statement and param
+        let (sql_statement, sql_params) = article.build_sql_insert();
+        let _execute_results = pg::execute(&pg_addr, &sql_statement, &sql_params);
 
         let mut results: Vec<Article> = vec![];
         results.push(article);
@@ -112,10 +111,9 @@ impl ArticleModule {
             authorname: authorname.clone(),
         };
 
-        // construct a sql statement
-        let sql_string = Article::update_sql();
-        let sql_params = article.build_update_param();
-        let _execute_results = pg::execute(&pg_addr, &sql_string, &sql_params);
+        // construct a sql statement and params
+        let (sql_statement, sql_params) = article.build_sql_update();
+        let _execute_results = pg::execute(&pg_addr, &sql_statement, &sql_params);
 
         let mut results: Vec<Article> = vec![];
         results.push(article);
@@ -140,9 +138,9 @@ impl ArticleModule {
         let id = params.get("id").unwrap();
 
         // construct a sql statement
-        let sql_string = Article::delete_sql();
-        let params = vec![ParameterValue::Str(id.as_str())];
-        let _execute_results = pg::execute(&pg_addr, &sql_string, &params);
+        let sql_statement = Article::delete_sql();
+        let sql_params = vec![ParameterValue::Str(id.as_str())];
+        let _execute_results = pg::execute(&pg_addr, &sql_statement, &sql_params);
         // TODO check the pg result
 
         let results: Vec<Article> = vec![];

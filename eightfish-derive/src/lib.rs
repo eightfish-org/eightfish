@@ -1,6 +1,29 @@
+//! Provide helper function for any user lay model
+//!
+//! For those function related to sql, will try to support model with following field type
+//!
+//!ParameterValue::Boolean(v)
+//!ParameterValue::Int32(v)
+//!ParameterValue::Int64(v)
+//!ParameterValue::Int8(v)
+//!ParameterValue::Int16(v)
+//!ParameterValue::Floating32(v)
+//!ParameterValue::Floating64(v)
+//!ParameterValue::Uint8(v)
+//!ParameterValue::Uint16(v)
+//!ParameterValue::Uint32(v)
+//!ParameterValue::Uint64(v)
+//!ParameterValue::Str(v)
+//!ParameterValue::Binary(v)
+//!ParameterValue::DbNull
+//!
+//!
+//!
+//!
 use proc_macro::{self, TokenStream};
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, FieldsNamed};
+
 #[proc_macro_derive(EightFishModel)]
 pub fn derive(input: TokenStream) -> TokenStream {
     let DeriveInput { ident, data, .. } = parse_macro_input!(input);
@@ -124,6 +147,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
             fn delete_sql() -> String {
                 format!("DELETE FROM {} WHERE id = $1", #ident_string.to_string().to_lowercase())
             }
+
             fn build_insert_param(&self) -> Vec<ParameterValue> {
                 let mut param_vec: Vec<ParameterValue> = Vec::new();
                 #(
@@ -131,12 +155,18 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 )*
                 param_vec
             }
+            fn build_sql_insert(&self) -> (String, Vec<ParameterValue>) {
+                (Self::insert_sql(), self.build_insert_param())
+            }
             fn build_update_param(&self) -> Vec<ParameterValue> {
                 let mut param_vec: Vec<ParameterValue> = Vec::new();
                 #(
                     param_vec.push(ParameterValue::Str(self.#idents4.as_str()));
                 )*
                 param_vec
+            }
+            fn build_sql_update(&self) -> (String, Vec<ParameterValue>) {
+                (Self::update_sql(), self.build_update_param())
             }
         }
         impl EightFishModel for #ident {
