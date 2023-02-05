@@ -7,7 +7,7 @@ pub enum Method {
     Post,
 }
 
-
+//#[derive(Debug)]
 pub struct EightFishRequest {
     method: Method,
     path: String,

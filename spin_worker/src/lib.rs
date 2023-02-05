@@ -18,9 +18,9 @@ use eightfish::{
 
 const REDIS_URL_ENV: &str = "REDIS_URL";
 const DB_URL_ENV: &str = "DB_URL";
-const TMP_CACHE_RESULTS: &str = "tmp:cache:{#}";
-const CACHE_STATUS_RESULTS: &str = "cache:status:{#}";
-const CACHE_RESULTS: &str = "cache:{#}";
+const TMP_CACHE_RESULTS: &str = "tmp:cache:#";
+const CACHE_STATUS_RESULTS: &str = "cache:status:#";
+const CACHE_RESULTS: &str = "cache:#";
 const CHANNEL_SPIN2PROXY: &str = "spin2proxy";
 
 
@@ -52,6 +52,7 @@ impl Worker {
     pub fn work(self, message: Bytes) -> Result<()> {
 
         let msg_obj: InputOutputObject = serde_json::from_slice(&message)?;
+        println!("Worker::work: msg_obj: {:?}", msg_obj);
 
         match &msg_obj.action[..] {
             "query" => {
@@ -64,15 +65,18 @@ impl Worker {
                 let reqdata = payload.reqdata.to_owned();
 
                 let mut ef_req = EightFishRequest::new(method, path, reqdata);
+                println!("Worker::work: in query branch: ef_req");
 
                 let ef_res = self.app.handle(&mut ef_req);
                 if ef_res.is_err() {
                     return Err(anyhow!("fooo get"));
                 }
                 let ef_res = ef_res.unwrap();
+                println!("Worker::work: in query branch: ef_res: {:?}", ef_res);
 
                 // we check the intermediate result  in the framework internal 
                 let pair_list = inner_stuffs_on_query_result(&reqid, &ef_res).unwrap();
+                println!("Worker::work: in query branch: pair_list: {:?}", pair_list);
 
                 let modelname = ef_res.info().model_name.to_owned();
                 // we can retrieve the model name from the path
@@ -90,14 +94,17 @@ impl Worker {
                 let reqdata = payload.reqdata.to_owned();
 
                 let mut ef_req = EightFishRequest::new(method, path, reqdata);
+                println!("Worker::work: in post branch: ef_req");
 
                 let ef_res = self.app.handle(&mut ef_req);
                 if ef_res.is_err() {
                     return Err(anyhow!("fooo post"));
                 }
+                println!("Worker::work: in post branch: ef_res: {:?}", ef_res);
                 let ef_res = ef_res.unwrap();
 
                 let pair_list = inner_stuffs_on_post_result(&ef_res).unwrap();
+                println!("Worker::work: in post branch: pair_list: {:?}", pair_list);
 
                 let modelname = ef_res.info().model_name.to_owned();
 
@@ -107,10 +114,20 @@ impl Worker {
                 // Callback: handle the result of the update_index call event
                 // the format of the msg_obj.data is: reqid:id:hash
                 // and msg.model is model, msg.action is action
-                let v: Vec<&str> = std::str::from_utf8(&msg_obj.data).unwrap().split(':').collect();
-                let reqid = &v[0];
-                let id = &v[1];
-                let hash = &v[2];
+                //let v: Vec<&str> = std::str::from_utf8(&msg_obj.data).unwrap().split(':').collect();
+                //println!("index_update callback: v: {:?}", v);
+                //let reqid = &v[0];
+                //let id = &v[1];
+                //let hash = &v[2];
+                let payload: Payload = serde_json::from_slice(&msg_obj.data)?;
+                println!("callback: update_index: payload: {:?}", payload);
+                let reqid = payload.reqid.to_owned();
+                let id = payload.reqdata.to_owned().unwrap();
+
+                let result = json!({
+                    "result": "Ok",
+                    "id": id,
+                });
                 
                 // while getting the index updated callback, we put result http_gate wants into redis
                 // cache
@@ -118,7 +135,7 @@ impl Worker {
                 let cache_key = CACHE_STATUS_RESULTS.replace('#', &reqid);
                 _ = redis::set(&redis_addr, &cache_key, b"true");
                 let cache_key = CACHE_RESULTS.replace('#', &reqid);
-                _ = redis::set(&redis_addr, &cache_key, &(id.to_string() + ":" + hash).as_bytes()); 
+                _ = redis::set(&redis_addr, &cache_key, &result.to_string().as_bytes()); 
 
             }
             "check_pair_list" => {
@@ -163,8 +180,10 @@ impl Worker {
 fn tail_query_process(redis_addr: &str, reqid: &str, modelname: &str, pair_list: &Vec<(String, String)>) {
     let payload = json!({
         "reqid": reqid,
-        "reqdata": pair_list,
+        "reqdata": Some(pair_list),
     });
+
+    println!("tail_query_process: payload: {:?}", payload);
     // XXX: here, maybe it's better to put check_pair_list value to action field
     let json_to_send = json!({
         "model": modelname,
@@ -180,8 +199,9 @@ fn tail_query_process(redis_addr: &str, reqid: &str, modelname: &str, pair_list:
 fn tail_post_process(redis_addr: &str, reqid: &str, modelname: &str, pair_list: &Vec<(String, String)>) {
     let payload = json!({
         "reqid": reqid,
-        "reqdata": pair_list,
+        "reqdata": Some(pair_list),
     });
+    println!("tail_post_process: payload: {:?}", payload);
 
     let json_to_send = json!({
         "model": modelname,
@@ -201,10 +221,11 @@ fn inner_stuffs_on_query_result(reqid: &str, res: &EightFishResponse) -> Result<
     let table_name = &res.info().model_name;
     let pair_list = res.pair_list().clone().unwrap();
     // get the id list from obj list
-    let ids: Vec<String> = pair_list.iter().map(|(id, hash)| id.to_owned()).collect();
+    let ids: Vec<String> = pair_list.iter().map(|(id, hash)| String::new() + "'" + &id + "'").collect();
     let ids_string = ids.join(",");
 
     let query_string = format!("select id, hash from {table_name}_idhash where id in ({ids_string})");
+    println!("query_string: {:?}", query_string);
     let rowset = pg::query(&pg_addr, &query_string, &vec![]).unwrap();
 
     let mut idhash_map: HashMap<String, String> = HashMap::new();
@@ -218,11 +239,13 @@ fn inner_stuffs_on_query_result(reqid: &str, res: &EightFishResponse) -> Result<
     // iterate on the input results to check
     for (id, chash) in pair_list.iter() {
         let hash_from_map = idhash_map.get(&id[..]).expect("");
+        println!("chash, hash_from_map: {:?}, {:?}", chash, hash_from_map);
         if chash != hash_from_map {
             return Err(anyhow!("Hash mismatching.".to_string()));
         }
     }
 
+    println!("res.results: {:?}", res.results());
     // store to cache for http gate to retrieve
     let data_to_cache = res.results().clone().unwrap_or("".to_string());
     _ = redis::set(&redis_addr, &TMP_CACHE_RESULTS.replace('#', &reqid), &data_to_cache.as_bytes());
@@ -249,18 +272,21 @@ fn inner_stuffs_on_post_result(res: &EightFishResponse) -> Result<Vec<(String, S
     }
 
     if action == "new"{
-        let sql_string = format!("insert into {table_name}_idhash values ({}, {})", id, ins_hash);
+        let sql_string = format!("insert into {table_name}_idhash values ('{}', '{}')", id, ins_hash);
         let _execute_results = pg::execute(&pg_addr, &sql_string, &vec![]);
         // TODO: check the pg result
+        println!("in post stuff: new: _execute_results: {:?}", _execute_results);
 
     } else if action == "update" {
-        let sql_string = format!("update {table_name}_idhash set hash={ins_hash} where id='{id}'");
+        let sql_string = format!("update {table_name}_idhash set hash='{ins_hash}' where id='{id}'");
         let _execute_results = pg::execute(&pg_addr, &sql_string, &vec![]);
+        println!("in post stuff: update: _execute_results: {:?}", _execute_results);
 
     } else if action == "delete" {
         let sql_string = format!("delete {table_name}_idhash where id='{id}'");
         let _execute_results = pg::execute(&pg_addr, &sql_string, &vec![]);
         // TODO: check the pg result
+        println!("in post stuff: delete: _execute_results: {:?}", _execute_results);
     }
     else {
 
