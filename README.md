@@ -6,7 +6,7 @@ Unlike the smart contract blockchain tech stack most DApps adopt, EightFish make
 
 By some elaberate designs, EightFish reaches the experiences of Web2/Internet web development, but for OpenWeb/Web3 decentralized application.
 
-Currently this project is under heavyly coded, the status is before alpha-releasing.
+Currently this project is under heavily coded, the status is before alpha-releasing.
 
 Note: EightFish itself is not a service/platform/serverless, it is just a dev framework tool.
 
