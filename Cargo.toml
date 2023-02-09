@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 #eightfish-derive = { version = "0.1.0", path = "eightfish-derive" }
-typemap = "0.3"
+#typemap = "0.3"
 anyhow = "1"
 form_urlencoded = "1.1"
 json-digest = "0.0.16"

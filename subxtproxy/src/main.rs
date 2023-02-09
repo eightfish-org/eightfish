@@ -23,7 +23,7 @@ pub struct InputOutputObject {
     model: String,
     action: String,
     data: Vec<u8>,
-    time: u64,
+    ext: Vec<u8>,
 }
 
 
@@ -34,6 +34,14 @@ pub struct Payload {
     reqid: String,
     reqdata: Option<PairList>,
 }
+
+#[derive(Deserialize, Debug)]
+pub struct ExtPayload {
+    time: u64,
+    nonce: u64,
+    randomvec: Vec<u8>,
+}
+
 
 #[subxt::subxt(runtime_metadata_path = "metadata.scale")]
 pub mod substrate {}
@@ -68,29 +76,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             if let (Some(ev), _) = &event {
                 println!("  Action event: {ev:?}");
 
-                let model = String::from_utf8(ev.1.clone()).unwrap();
-                let action = String::from_utf8(ev.2.clone()).unwrap();
-                let data = ev.3.clone();
-                let time = ev.4;
+                let model = String::from_utf8(ev.0.clone()).unwrap();
+                let action = String::from_utf8(ev.1.clone()).unwrap();
+                let data = ev.2.clone();
+                let time = ev.3;
+                let randomvec = ev.4.clone();
+                let nonce = ev.5;
+
+                let ext = json!({
+                    "time": time,
+                    "nonce": nonce,
+                    "randomvec": randomvec,
+                });
 
                 let output = InputOutputObject {
                     model,
                     action,
                     data,
-                    time,
+                    ext: ext.to_string().as_bytes().to_vec(),
                 };
 
-                let output_vec = serde_json::to_vec (&output).unwrap();
+                let output_vec = serde_json::to_vec(&output).unwrap();
                 let _: Result<String, redis::RedisError> = redis_conn.publish("proxy2spin", output_vec).await;
 
             }
             if let (_, Some(ev)) = &event {
                 println!("  IndexUpdated event: {ev:?}");
 
-                let model = String::from_utf8(ev.1.clone()).unwrap();
-                let action = String::from_utf8(ev.2.clone()).unwrap();
-                let data = String::from_utf8(ev.3.clone()).unwrap();
-                let time = ev.4;
+                let model = String::from_utf8(ev.0.clone()).unwrap();
+                let action = String::from_utf8(ev.1.clone()).unwrap();
+                let data = String::from_utf8(ev.2.clone()).unwrap();
+                let time = ev.3;
 
                 let v: Vec<&str> = data.split(':').collect();
                 println!("IndexUpdated event: v: {:?}", v);
@@ -106,7 +122,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     model,
                     action,
                     data: payload.to_string().as_bytes().to_vec(),
-                    time,
+                    ext: vec![],
                 };
 
                 let output_vec = serde_json::to_vec(&output).unwrap();
@@ -195,7 +211,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     model: msg_obj.model,
                     action: msg_obj.action,
                     data: ret_payload.to_string().as_bytes().to_vec(),
-                    time: 0,
+                    ext: vec![],
                 };
                 let output_string = serde_json::to_vec(&output).unwrap();
                 redis_conn1.publish("proxy2spin", output_string).await?;
@@ -211,7 +227,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         model: msg_obj.model,
                         action: msg_obj.action,
                         data: flag.to_string().as_bytes().to_vec(),
-                        time: 0,
+                        ext: vec![],
                     };
                     let output_vec = serde_json::to_vec(&output).unwrap();
                     redis_conn1.publish("proxy2upgrade", output_vec).await?;
@@ -231,7 +247,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         model: msg_obj.model,
                         action: msg_obj.action,
                         data: wasmfile,
-                        time: 0,
+                        ext: vec![],
                     };
                     let output_vec = serde_json::to_vec(&output).unwrap();
                     redis_conn1.publish("proxy2upgrade", output_vec).await?;

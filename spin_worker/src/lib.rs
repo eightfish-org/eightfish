@@ -29,7 +29,7 @@ pub struct InputOutputObject {
     model: String,
     action: String,
     data: Vec<u8>,
-    time: u64,
+    ext: Vec<u8>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -37,6 +37,14 @@ pub struct Payload {
     reqid: String,
     reqdata: Option<String>,
 }
+
+#[derive(Deserialize, Debug)]
+pub struct ExtPayload {
+    time: u64,
+    nonce: u64,
+    randomvec: Vec<u8>,
+}
+
 
 pub struct Worker {
     app: EightFishApp,    
@@ -92,9 +100,17 @@ impl Worker {
                 let payload: Payload = serde_json::from_slice(&msg_obj.data)?;
                 let reqid = payload.reqid.to_owned();
                 let reqdata = payload.reqdata.to_owned();
+                let ext: ExtPayload = serde_json::from_slice(&msg_obj.ext)?;
 
                 let mut ef_req = EightFishRequest::new(method, path, reqdata);
                 println!("Worker::work: in post branch: ef_req");
+
+                // add time to req.ext
+                ef_req.ext_mut().insert("time".to_string(), ext.time.to_string());
+                // add nonce to req.ext
+                ef_req.ext_mut().insert("nonce".to_string(), ext.nonce.to_string());
+                // add randomvec to req.ext
+                ef_req.ext_mut().insert("randomvec".to_string(), ext.randomvec.to_string());
 
                 let ef_res = self.app.handle(&mut ef_req);
                 if ef_res.is_err() {
@@ -189,7 +205,7 @@ fn tail_query_process(redis_addr: &str, reqid: &str, modelname: &str, pair_list:
         "model": modelname,
         "action": "check_pair_list",
         "data": payload.to_string().as_bytes().to_vec(),
-        "time": 0
+        "ext": vec![],
     });
 
     // send this to the redis channel to subxt to query rpc
@@ -207,7 +223,7 @@ fn tail_post_process(redis_addr: &str, reqid: &str, modelname: &str, pair_list: 
         "model": modelname,
         "action": "update_index",
         "data": payload.to_string().as_bytes().to_vec(),
-        "time": 0
+        "ext": vec![],
     });
 
     _ = redis::publish(&redis_addr, CHANNEL_SPIN2PROXY, &json_to_send.to_string().as_bytes());

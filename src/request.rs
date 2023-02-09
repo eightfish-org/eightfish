@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use typemap::TypeMap;
 
 #[derive(Eq, Hash, PartialEq, Clone)]
 pub enum Method {
@@ -12,7 +11,7 @@ pub struct EightFishRequest {
     method: Method,
     path: String,
     data: Option<String>,
-    ext: TypeMap,
+    ext: HashMap<String, String>,
 }
 
 impl EightFishRequest {
@@ -21,7 +20,7 @@ impl EightFishRequest {
             method: method,
             path: path,
             data: data,
-            ext: TypeMap::new(),
+            ext: HashMap::new(),
         }
     }
 
@@ -41,12 +40,12 @@ impl EightFishRequest {
     }
 
     /// get request struct ext ref
-    pub fn ext(&self) -> &TypeMap {
+    pub fn ext(&self) -> &HashMap<String, String> {
         &self.ext
     }
 
     /// get request struct ext mut ref
-    pub fn ext_mut(&mut self) -> &mut TypeMap {
+    pub fn ext_mut(&mut self) -> &mut HashMap<String, String> {
         &mut self.ext
     }
 

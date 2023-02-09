@@ -80,7 +80,7 @@ fn http_gate(req: Request) -> Result<Response> {
         "model": path,
         "action": &method,
         "data": payload.to_string().as_bytes().to_vec(),
-        "time": 0
+        "ext": vec![],
     });
 
     if &method == "post" {
