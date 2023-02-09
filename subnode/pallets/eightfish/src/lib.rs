@@ -15,7 +15,9 @@ mod benchmarking;
 
 #[frame_support::pallet]
 pub mod pallet {
-	use frame_support::pallet_prelude::*;
+    use sp_core::H256;
+    use frame_support::traits::Randomness;
+    use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
 
     use frame_support::inherent::Vec;
@@ -26,6 +28,7 @@ pub mod pallet {
     type ModelName = Vec<u8>;
     type ActionName = Vec<u8>;
     type Payload = Vec<u8>;
+    type RandomOutput = Vec<u8>;
 
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
@@ -38,11 +41,12 @@ pub mod pallet {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
         type TimeProvider: UnixTime;
+        type MyRandomness: Randomness<H256, u64>;
 	}
 
-	//#[pallet::storage]
-	//#[pallet::getter(fn something)]
-	//pub type Something<T> = StorageValue<_, u32>;
+	#[pallet::storage]
+	//#[pallet::getter(fn nonce)]
+	pub type Nonce<T> = StorageValue<_, u64>;
 
     #[pallet::storage]
     pub(super) type ModelIdHashDoubleMap<T: Config> =
@@ -59,11 +63,10 @@ pub mod pallet {
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		/// [who, model, action, data, time]
-		Action(T::AccountId, ModelName, ActionName, Payload, u64),
-		IndexUpdated(T::AccountId, ModelName, ActionName, Payload, u64),
-		Upgrade(T::AccountId, bool, u64),
-		DisableUpgrade(T::AccountId, bool, u64),
+		Action(ModelName, ActionName, Payload, u64, RandomOutput, u64),
+		IndexUpdated(ModelName, ActionName, Payload, u64),
+		Upgrade(bool, u64),
+		DisableUpgrade(bool, u64),
 	}
 
 	#[pallet::error]
@@ -82,10 +85,17 @@ pub mod pallet {
 
             let block_time: u64 = T::TimeProvider::now().as_secs();
 
+            // TODO: generate a randomvec
+            // Random value.
+            let (nonce, noncevec) = Self::get_and_increment_nonce();
+            let (random_value, _) = T::MyRandomness::random(&noncevec);
+            let randomvec = random_value.to_vec();
+
             // In this call function, we do nothing now, excepting emitting the event back
             // This trick is to record the original requests from users to the blocks,
             // but not record it to the on-chain storage.
-			Self::deposit_event(Event::Action(who, model, action, payload, block_time));
+			Self::deposit_event(Event::Action(model, action, payload, block_time, randomvec, nonce));
+
 			Ok(())
 		}
 
@@ -106,7 +116,8 @@ pub mod pallet {
             //payload.push(b':');
             //payload.extend_from_slice(&hash);
 
-			Self::deposit_event(Event::IndexUpdated(who, model, action, payload, block_time));
+			Self::deposit_event(Event::IndexUpdated(model, action, payload, block_time));
+
 			Ok(())
 		}
 
@@ -125,7 +136,8 @@ pub mod pallet {
             // In this call function, we do nothing now, excepting emitting the event back
             // This trick is to record the original requests from users to the blocks,
             // but not record it to the on-chain storage.
-			Self::deposit_event(Event::Upgrade(who, true, block_time));
+			Self::deposit_event(Event::Upgrade(true, block_time));
+
 			Ok(())
 		}
 
@@ -141,7 +153,8 @@ pub mod pallet {
             // In this call function, we do nothing now, excepting emitting the event back
             // This trick is to record the original requests from users to the blocks,
             // but not record it to the on-chain storage.
-			Self::deposit_event(Event::DisableUpgrade(who, false, block_time));
+			Self::deposit_event(Event::DisableUpgrade(false, block_time));
+
 			Ok(())
 		}
 	}
@@ -156,6 +169,12 @@ pub mod pallet {
                 }
             }
             return true;
+        }
+
+        fn get_and_increment_nonce() -> (u64, Vec<u8>) {
+            let nonce = Nonce::<T>::get();
+            Nonce::<T>::put(nonce.wrapping_add(1));
+            (nonce, nonce.encode())
         }
     }
 

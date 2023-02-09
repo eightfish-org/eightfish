@@ -6,11 +6,6 @@ pub use crate::request::EightFishRequest;
 pub use crate::response::EightFishResponse;
 pub use crate::router::EightFishRouter;
 pub use crate::router_m::Router;
-pub use typemap::Key;
-
-/// Path parameter type
-#[derive(Clone)]
-pub struct PathParams;
 
 /// EightFish Error
 #[derive(Debug, PartialEq, Clone)]

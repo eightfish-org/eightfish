@@ -1,16 +1,12 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::app::{Error, Key, PathParams, Result};
+use crate::app::{Error, Result};
 use crate::handler::EightFishHandler;
 use crate::request::{Method, EightFishRequest};
 use crate::response::EightFishResponse;
 
 use crate::recognizer::{Router as Recognizer, Match, Params};
-
-impl Key for PathParams {
-    type Value = Params;
-}
 
 /// `Router` provides an interface for creating complex routes as middleware
 /// for the Iron framework.
@@ -104,7 +100,9 @@ impl Router {
 
     pub fn handle_method(&self, req: &mut EightFishRequest, path: &str) -> Result<EightFishResponse> {
         if let Some(matched) = self.recognize(&req.method(), path) {
-            req.ext_mut().insert::<PathParams>(matched.params);
+            // extract the url-inner params to req.ext hashmap
+            mathed.params.iter().map(|key, val| req.ext_mut().insert(key.to_owned(), val.to_owned()));
+            // call handle on req
             matched.handler.handle(req)
         } else {
             // panic!("router not matched!");
