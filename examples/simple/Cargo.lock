@@ -90,7 +90,6 @@ dependencies = [
  "json-digest",
  "serde",
  "serde_json",
- "typemap",
 ]
 
 [[package]]
@@ -145,6 +144,12 @@ checksum = "6d621efb26863f0e9924c6ac577e8275e5e6b77455db64ffa6c65c904e9e132c"
 dependencies = [
  "unicode-segmentation",
 ]
+
+[[package]]
+name = "hex"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "http"
@@ -347,6 +352,7 @@ dependencies = [
 [[package]]
 name = "spin-macro"
 version = "0.1.0"
+source = "git+https://github.com/fermyon/spin#7cbcd4fa5be15d16d74ab10ce566ec7520b7204d"
 dependencies = [
  "anyhow",
  "bytes",
@@ -361,7 +367,8 @@ dependencies = [
 
 [[package]]
 name = "spin-sdk"
-version = "0.7.1"
+version = "0.8.0"
+source = "git+https://github.com/fermyon/spin#7cbcd4fa5be15d16d74ab10ce566ec7520b7204d"
 dependencies = [
  "anyhow",
  "bytes",
@@ -380,6 +387,7 @@ dependencies = [
  "bytes",
  "eightfish",
  "form_urlencoded",
+ "hex",
  "json-digest",
  "serde",
  "serde_json",
@@ -443,21 +451,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
-name = "traitobject"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "efd1f82c56340fdf16f2a953d7bda4f8fdffba13d93b00844c25572110b26079"
-
-[[package]]
-name = "typemap"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "653be63c80a3296da5551e1bfd2cca35227e13cdd08c6668903ae2f4f77aa1f6"
-dependencies = [
- "unsafe-any",
-]
-
-[[package]]
 name = "unicase"
 version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -492,15 +485,6 @@ name = "unicode-xid"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f962df74c8c05a667b5ee8bcf162993134c104e96440b663c8daa176dc772d8c"
-
-[[package]]
-name = "unsafe-any"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f30360d7979f5e9c6e6cea48af192ea8fab4afb3cf72597154b8f08935bc9c7f"
-dependencies = [
- "traitobject",
-]
 
 [[package]]
 name = "uuid"

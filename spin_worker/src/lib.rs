@@ -206,7 +206,7 @@ fn tail_query_process(redis_addr: &str, reqid: &str, modelname: &str, pair_list:
         "model": modelname,
         "action": "check_pair_list",
         "data": payload.to_string().as_bytes().to_vec(),
-        "ext": vec![],
+        "ext": Vec::<u8>::new(),
     });
 
     // send this to the redis channel to subxt to query rpc
@@ -224,7 +224,7 @@ fn tail_post_process(redis_addr: &str, reqid: &str, modelname: &str, pair_list: 
         "model": modelname,
         "action": "update_index",
         "data": payload.to_string().as_bytes().to_vec(),
-        "ext": vec![],
+        "ext": Vec::<u8>::new(),
     });
 
     _ = redis::publish(&redis_addr, CHANNEL_SPIN2PROXY, &json_to_send.to_string().as_bytes());
