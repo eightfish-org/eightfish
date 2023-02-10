@@ -41,12 +41,12 @@ pub mod pallet {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
         type TimeProvider: UnixTime;
-        type MyRandomness: Randomness<H256, u64>;
+        type MyRandomness: Randomness<H256, Self::BlockNumber>;
 	}
 
 	#[pallet::storage]
 	//#[pallet::getter(fn nonce)]
-	pub type Nonce<T> = StorageValue<_, u64>;
+	pub type Nonce<T> = StorageValue<_, u64, ValueQuery>;
 
     #[pallet::storage]
     pub(super) type ModelIdHashDoubleMap<T: Config> =
@@ -81,7 +81,7 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
 		pub fn act(origin: OriginFor<T>, model: ModelName, action: ActionName, payload: Payload) -> DispatchResult {
-			let who = ensure_signed(origin)?;
+			let _who = ensure_signed(origin)?;
 
             let block_time: u64 = T::TimeProvider::now().as_secs();
 
@@ -89,7 +89,7 @@ pub mod pallet {
             // Random value.
             let (nonce, noncevec) = Self::get_and_increment_nonce();
             let (random_value, _) = T::MyRandomness::random(&noncevec);
-            let randomvec = random_value.to_vec();
+            let randomvec = random_value.as_bytes().to_vec();
 
             // In this call function, we do nothing now, excepting emitting the event back
             // This trick is to record the original requests from users to the blocks,
@@ -101,7 +101,7 @@ pub mod pallet {
 
 		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1,1))]
 		pub fn update_index(origin: OriginFor<T>, model: ModelName, reqid: Payload, id: IdType, hash: HashType) -> DispatchResult {
-			let who = ensure_signed(origin)?;
+			let _who = ensure_signed(origin)?;
 
             let block_time: u64 = T::TimeProvider::now().as_secs();
 
@@ -123,8 +123,7 @@ pub mod pallet {
 
 		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1,1))]
 		pub fn wasm_upgrade(origin: OriginFor<T>, wasm_file: Vec<u8>) -> DispatchResult {
-			//let who = ensure_root(origin)?;
-			let who = ensure_signed(origin)?;
+			let _who = ensure_signed(origin)?;
 
             let block_time: u64 = T::TimeProvider::now().as_secs();
 
@@ -143,8 +142,7 @@ pub mod pallet {
 
 		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1,1))]
 		pub fn disable_wasm_upgrade_flag(origin: OriginFor<T>) -> DispatchResult {
-			//let who = ensure_root(origin)?;
-			let who = ensure_signed(origin)?;
+			let _who = ensure_signed(origin)?;
 
             let block_time: u64 = T::TimeProvider::now().as_secs();
 

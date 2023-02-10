@@ -265,7 +265,9 @@ impl pallet_sudo::Config for Runtime {
 /// Configure the pallet-template in pallets/template.
 impl pallet_eightfish::Config for Runtime {
 	type Event = Event;
-    type TimeProvider = pallet_timestamp::Pallet<Runtime>;
+    //type TimeProvider = pallet_timestamp::Pallet<Runtime>;
+    type TimeProvider = Timestamp;
+    type MyRandomness = RandomnessCollectiveFlip;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.

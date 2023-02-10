@@ -109,8 +109,9 @@ impl Worker {
                 ef_req.ext_mut().insert("time".to_string(), ext.time.to_string());
                 // add nonce to req.ext
                 ef_req.ext_mut().insert("nonce".to_string(), ext.nonce.to_string());
-                // add randomvec to req.ext
-                ef_req.ext_mut().insert("randomvec".to_string(), ext.randomvec.to_string());
+                // encode the vec<u8> as hex string, each byte to 2 bchar. And add randomvec to req.ext
+                let random_string = hex::encode(&ext.randomvec);
+                ef_req.ext_mut().insert("random_str".to_string(), random_string);
 
                 let ef_res = self.app.handle(&mut ef_req);
                 if ef_res.is_err() {
