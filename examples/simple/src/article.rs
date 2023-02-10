@@ -2,7 +2,6 @@ use eightfish::{EightFishModel, Info, Module, Request, Response, Result, Router,
 use eightfish_derive::EightFishModel;
 use serde::{Deserialize, Serialize};
 use spin_sdk::pg::{self, Decode, ParameterValue};
-use uuid::Uuid;
 
 const REDIS_URL_ENV: &str = "REDIS_URL";
 const DB_URL_ENV: &str = "DB_URL";
@@ -67,7 +66,7 @@ impl ArticleModule {
         let content = params.get("content").unwrap();
         let authorname = params.get("authorname").unwrap();
 
-        let id = Uuid::new_v4().simple().to_string(); // uuid
+        let id = req.ext().get("random_str").unwrap();
 
         // construct a struct
         let article = Article {
