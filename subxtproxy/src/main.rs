@@ -179,8 +179,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .eight_fish_module()
                     .update_index(msg_obj.model.as_bytes().to_vec(), 
                                   reqid.as_bytes().to_vec(), 
-                                  id, 
-                                  hash;
+                                  id.clone(), 
+                                  hash.clone());
 
                 let _hash = api.tx().sign_and_submit_default(&tx, &signer).await.unwrap();
 

@@ -6,8 +6,7 @@ edition = "2021"
 [dependencies]
 futures = "0.3.13"
 tokio = { version = "1.8", features = ["rt-multi-thread", "macros", "time"] }
-#subxt = { git = "https://github.com/paritytech/subxt" }
-subxt = {path = "../../subxt/subxt" }
+subxt = { git = "https://github.com/paritytech/subxt", tag = "v0.24.0" }
 sp-keyring = "6.0.0"
 codec = { package = "parity-scale-codec", version = "3.2.1", default-features = false, features = ["derive", "full", "bit-vec"] }
 hex = "0.4.3"

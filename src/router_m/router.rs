@@ -101,7 +101,9 @@ impl Router {
     pub fn handle_method(&self, req: &mut EightFishRequest, path: &str) -> Result<EightFishResponse> {
         if let Some(matched) = self.recognize(&req.method(), path) {
             // extract the url-inner params to req.ext hashmap
-            mathed.params.iter().map(|key, val| req.ext_mut().insert(key.to_owned(), val.to_owned()));
+            for (key, val) in matched.params.iter() {
+                req.ext_mut().insert(key.to_owned(), val.to_owned());
+            }
             // call handle on req
             matched.handler.handle(req)
         } else {
