@@ -87,12 +87,15 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
             fn model_name() -> String {
                 #ident_string.to_string().to_lowercase()
             }
+
             fn field_names() -> String {
                 format!("{}", #field_names)
             }
+
             fn update_placeholders() -> String {
                 #update_field_placeholders.to_string().replace("\"", "")
             }
+
             fn row_placeholders() -> String {
                 #field_placeholders.to_string().replace("\"", "")
             }
@@ -108,7 +111,8 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
             fn build_get_one_sql() -> String {
                 format!("SELECT {} FROM {} WHERE id = $1", #field_names, #ident_string.to_string().to_lowercase())
             }
-            fn build_get_all_sql(limit: Option<u64>, offset: Option<u64>) -> String {
+
+            fn build_get_list_sql(limit: Option<u64>, offset: Option<u64>) -> String {
                 let query = format!("SELECT {} FROM {}", #field_names, #ident_string.to_string().to_lowercase());
                 match (limit, offset) {
                     (Some(l), Some(o)) => format!("{} LIMIT {} OFFSET {}", query, l, o),
@@ -116,25 +120,31 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
                     _ => query
                 }
             }
+
             fn build_insert_sql() -> String {
                 format!("INSERT INTO {}({}) VALUES ({})", #ident_string.to_string().to_lowercase(), #field_names, #field_placeholders.to_string().replace("\"", ""))
             }
+
             fn build_update_sql() -> String {
                 format!("UPDATE {} SET {} WHERE id = $1", #ident_string.to_string().to_lowercase(), #update_field_placeholders.to_string().replace("\"", ""))
             }
+
             fn build_delete_sql() -> String {
                 format!("DELETE FROM {} WHERE id = $1", #ident_string.to_string().to_lowercase())
             }
+
             fn build_get_one_params(id: &str) -> Vec<ParameterValue> {
                 let mut param_vec: Vec<ParameterValue> = Vec::new();
                 param_vec.push(ParameterValue::Str(id));
                 param_vec
             }
+
             fn build_delete_params(id: &str) -> Vec<ParameterValue> {
                 let mut param_vec: Vec<ParameterValue> = Vec::new();
                 param_vec.push(ParameterValue::Str(id));
                 param_vec
             }
+
             fn build_insert_params(&self) -> Vec<ParameterValue> {
                 let mut param_vec: Vec<ParameterValue> = Vec::new();
                 #(
@@ -142,6 +152,7 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
                 )*
                 param_vec
             }
+
             fn build_update_params(&self) -> Vec<ParameterValue> {
                 let mut param_vec: Vec<ParameterValue> = Vec::new();
                 #(
@@ -149,12 +160,15 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
                 )*
                 param_vec
             }
+
             fn build_get_one_sql_and_params(id: &str) -> (String, Vec<ParameterValue>) {
                 (Self::build_get_one_sql(), Self::build_get_one_params(id))
             }
+
             fn build_delete_sql_and_params(id: &str) -> (String, Vec<ParameterValue>) {
                 (Self::build_delete_sql(), Self::build_delete_params(id))
             }
+
             fn build_insert_sql_and_params(&self) -> (String, Vec<ParameterValue>) {
                 (Self::build_insert_sql(), self.build_insert_params())
             }

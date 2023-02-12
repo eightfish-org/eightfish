@@ -35,14 +35,14 @@ fn test_get_one_sql() {
 }
 
 #[test]
-fn test_get_all_sql() {
+fn test_get_list_sql() {
     assert_eq!(
         "SELECT id, title, content FROM foo",
-        Foo::build_get_all_sql(None, None)
+        Foo::build_get_list_sql(None, None)
     );
     assert_eq!(
         "SELECT id, title, content FROM foo LIMIT 10 OFFSET 10",
-        Foo::build_get_all_sql(Some(10), Some(10))
+        Foo::build_get_list_sql(Some(10), Some(10))
     );
 }
 
