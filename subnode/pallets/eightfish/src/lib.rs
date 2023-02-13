@@ -190,7 +190,7 @@ pub mod pallet {
         }
 
         /// Inner helper function, for increase the nonce used by generating a on-chan random vector.
-        fn get_and_increment_nonce() -> (u64, Vec<u8>) {
+        pub fn get_and_increment_nonce() -> (u64, Vec<u8>) {
             let nonce = Nonce::<T>::get();
             Nonce::<T>::put(nonce.wrapping_add(1));
             (nonce, nonce.encode())
