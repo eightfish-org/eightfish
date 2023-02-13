@@ -10,3 +10,8 @@ Currently this project is under heavily coded, the status is before alpha-releas
 
 Note: EightFish itself is not a service/platform/serverless, it is just a dev framework tool.
 
+## License
+
+GPLv3.0
+
+
