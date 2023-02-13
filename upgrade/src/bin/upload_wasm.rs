@@ -8,12 +8,12 @@ use subxt::{
     SubstrateConfig,
 };
 
-#[subxt::subxt(runtime_metadata_path = "../openforum_subxtproxy/metadata.scale")]
+#[subxt::subxt(runtime_metadata_path = "../subxtproxy/metadata.scale")]
 pub mod substrate {}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tracing_subscriber::fmt::init();
+    //tracing_subscriber::fmt::init();
     let key = "WASMFILE_TOUPLOAD";
     let wasmfile_path: String = dotenv::var(key).unwrap();
 
@@ -30,7 +30,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create a transaction to submit:
     let tx = substrate::tx()
-        .open_forum_module()
+        .eight_fish_module()
         .wasm_upgrade(contents);
 
     // Submit the transaction with default params:

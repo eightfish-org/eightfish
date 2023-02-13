@@ -16,7 +16,7 @@ fn it_works() {
 fn wontwork() {
 	new_test_ext().execute_with(|| {
 		// Dispatch a signed extrinsic.
-		assert_eq!(TemplateModule::get_and_increment_nonce().0, 1);
+		assert_ne!(TemplateModule::get_and_increment_nonce().0, 1);
 	});
 }
 
@@ -44,7 +44,7 @@ fn wontwork_update_index_and_check_pair_list() {
 		// Dispatch a signed extrinsic.
         _ = TemplateModule::update_index(Origin::signed(1), model.clone(), reqid, id.clone(), hash.clone());
 
-		assert_eq!(TemplateModule::check_pair_list(model, vec![(id, "ztfjajdjfj".as_bytes().to_vec())]), true);
+		assert_ne!(TemplateModule::check_pair_list(model, vec![(id, "ztfjajdjfj".as_bytes().to_vec())]), true);
 	});
 }
 
