@@ -27,7 +27,7 @@ pub struct InputOutputObject {
 }
 
 
-type PairList = Vec<(Vec<u8>, Vec<u8>)>;
+type PairList = Vec<(String, String)>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Payload {
@@ -179,8 +179,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .eight_fish_module()
                     .update_index(msg_obj.model.as_bytes().to_vec(), 
                                   reqid.as_bytes().to_vec(), 
-                                  id.clone(), 
-                                  hash.clone());
+                                  id.as_bytes().to_vec(), 
+                                  hash.as_bytes().to_vec());
 
                 let _hash = api.tx().sign_and_submit_default(&tx, &signer).await.unwrap();
 
@@ -192,6 +192,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("from redis: check_pair_list: payload: {:?}", payload);
                 let model = msg_obj.model.clone().as_bytes().to_vec();
                 let pair_list = payload.reqdata.clone().unwrap();
+                let pair_list: Vec<(Vec<u8>, Vec<u8>)> = pair_list.into_iter().map(|(id, hash)| (id.as_bytes().to_vec(), hash.as_bytes().to_vec())).collect();
 
                 let params: RpcParams = rpc_params![None::<sp_core::H256>, model, pair_list];
 
