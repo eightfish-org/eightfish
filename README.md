@@ -33,7 +33,7 @@ now you're in the docker dev environment.
 Use psql to create pg db and tables.
 
 ```
-> sudo su postgres && psql
+> su postgres && psql
 > alter user postgres with password '123456';
 > create database spin_dev;
 > \c spin_dev;
@@ -58,10 +58,10 @@ You may use tools of screen or tmux to open multiple windows.
 
 ```
 # open a new terminal tab:
-cd subnode && target/release/eightfish_subnode --dev
+cd subnode && cargo build --release && target/release/eightfish_subnode --dev
 
 # open a new terminal tab:
-cd subxtproxy && target/release/subxtproxy
+cd subxtproxy && cargo build --release && target/release/subxtproxy
 
 # open a new terminal tab:
 cd http_gate && spin build --up --follow-all
