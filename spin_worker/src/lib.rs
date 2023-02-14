@@ -110,7 +110,9 @@ impl Worker {
                 // add nonce to req.ext
                 ef_req.ext_mut().insert("nonce".to_string(), ext.nonce.to_string());
                 // encode the vec<u8> as hex string, each byte to 2 bchar. And add randomvec to req.ext
-                let random_string = hex::encode(&ext.randomvec);
+                //let random_string = hex::encode(&ext.randomvec);
+                // encode the vec<u8> as base58 string, and add random_str to req.ext
+                let random_string = bs58::encode(&ext.randomvec).into_string();
                 ef_req.ext_mut().insert("random_str".to_string(), random_string);
 
                 let ef_res = self.app.handle(&mut ef_req);

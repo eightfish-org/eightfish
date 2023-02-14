@@ -17,6 +17,7 @@ serde = { version = '1.0', default-features = false, features = ['derive'] }
 serde_json = { version = '1.0', default-features = false, features = ['alloc'] }
 json-digest = "0.0.16"
 hex = "0.4.3"
+bs58 = "0.4.0"
 
 eightfish = {path="../"}
 
