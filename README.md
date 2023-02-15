@@ -1,6 +1,10 @@
 # EightFish
 
-EightFish(8fish) is a framework to develop a decentralized application in Web2 development style.
+What is EightFish?
+
+EightFish is a development framework (maybe the first one) for the Open Data Application (ODA). The theory of the ODA locates [here](https://medium.com/@daogangtang/the-road-to-open-web-b684879a5571). In short description: EightFish powers the ODAs, ODAs constitute the Open Web.
+
+Concretely, EightFish(8fish) is a framework to develop a decentralized application in Web2 development style.
 
 Unlike the smart contract blockchain tech stack most DApps adopt, EightFish makes your own network, a sovereign network which doesn't reply on any other Web3 layers or services.
 
