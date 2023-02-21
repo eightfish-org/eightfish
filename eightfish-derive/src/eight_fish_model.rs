@@ -48,7 +48,7 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
     let update_field_placeholders = field_identifiers
         .clone()
         .enumerate()
-        .map(|(i, ident)| format!("{} = ${}", quote! {#ident}, i + 2))
+        .map(|(i, ident)| format!("{} = ${}", quote! {#ident}, i + 1))
         .collect::<Vec<String>>()
         .join(", ");
 
