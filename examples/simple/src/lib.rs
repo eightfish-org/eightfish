@@ -16,11 +16,11 @@ mod article;
 struct MyGlobalFilter;
 
 impl GlobalFilter for MyGlobalFilter {
-    fn before(&self, req: &mut Request) -> EightFishResult<()> {
+    fn before(&self, _req: &mut Request) -> EightFishResult<()> {
         Ok(())
     }
 
-    fn after(&self, req: &Request, res: &mut Response) -> EightFishResult<()> {
+    fn after(&self, _req: &Request, _res: &mut Response) -> EightFishResult<()> {
         Ok(())
     }
 }

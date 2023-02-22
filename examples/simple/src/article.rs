@@ -52,7 +52,7 @@ impl ArticleModule {
         Ok(response)
     }
 
-    fn new(req: &mut Request) -> Result<Response> {
+    fn new_article(req: &mut Request) -> Result<Response> {
         let pg_addr = std::env::var(DB_URL_ENV).unwrap();
 
         let params = req.parse_urlencoded();
@@ -79,8 +79,7 @@ impl ArticleModule {
             _execute_results
         );
 
-        let mut results: Vec<Article> = vec![];
-        results.push(article);
+        let results: Vec<Article> = vec![article];
 
         let info = Info {
             model_name: "article".to_string(),
@@ -116,8 +115,7 @@ impl ArticleModule {
         let (sql_statement, sql_params) = article.build_update_sql_and_params();
         let _execute_results = pg::execute(&pg_addr, &sql_statement, &sql_params);
 
-        let mut results: Vec<Article> = vec![];
-        results.push(article);
+        let results: Vec<Article> = vec![article];
 
         let info = Info {
             model_name: "article".to_string(),
@@ -162,7 +160,7 @@ impl Module for ArticleModule {
     fn router(&self, router: &mut Router) -> Result<()> {
         router.get("/article/:id", Self::get_one);
         //router.get("/article/latest", Self::get_latest);
-        router.post("/article/new", Self::new);
+        router.post("/article/new", Self::new_article);
         router.post("/article/update", Self::update);
         router.post("/article/delete/:id", Self::delete);
 
