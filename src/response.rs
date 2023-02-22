@@ -1,5 +1,4 @@
-use anyhow::Result;
-use serde::{Deserialize, Serialize};
+use serde::{Serialize};
 
 /// Response status
 #[derive(Clone, Debug)]
@@ -40,8 +39,8 @@ impl EightFishResponse {
         info: Info,
         aresults: Vec<T>,
     ) -> EightFishResponse {
-        let mut pair_list;
-        let mut results;
+        let pair_list;
+        let results;
 
         if aresults.is_empty() {
             pair_list = None;

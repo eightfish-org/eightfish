@@ -1,3 +1,5 @@
+#![allow(clippy::needless_lifetimes)]
+#![allow(clippy::upper_case_acronyms)]
 pub mod nfa;
 
 use self::nfa::CharacterClass;
@@ -67,6 +69,12 @@ pub struct Params {
     map: BTreeMap<String, String>,
 }
 
+impl Default for Params {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Params {
     pub fn new() -> Params {
         Params {
@@ -129,8 +137,8 @@ pub struct Match<T> {
 impl<T> Match<T> {
     pub fn new(handler: T, params: Params) -> Match<T> {
         Match {
-            handler: handler,
-            params: params,
+            handler,
+            params,
         }
     }
 }
@@ -150,7 +158,7 @@ impl<T> Router<T> {
     }
 
     pub fn add(&mut self, mut route: &str, dest: T) {
-        if route.len() != 0 && route.as_bytes()[0] == b'/' {
+        if !route.is_empty() && route.as_bytes()[0] == b'/' {
             route = &route[1..];
         }
 
@@ -163,11 +171,11 @@ impl<T> Router<T> {
                 state = nfa.put(state, CharacterClass::valid_char('/'));
             }
 
-            if segment.len() > 0 && segment.as_bytes()[0] == b':' {
+            if !segment.is_empty() && segment.as_bytes()[0] == b':' {
                 state = process_dynamic_segment(nfa, state);
                 metadata.dynamics += 1;
                 metadata.param_names.push(segment[1..].to_string());
-            } else if segment.len() > 0 && segment.as_bytes()[0] == b'*' {
+            } else if !segment.is_empty() && segment.as_bytes()[0] == b'*' {
                 state = process_star_state(nfa, state);
                 metadata.stars += 1;
                 metadata.param_names.push(segment[1..].to_string());
@@ -183,7 +191,7 @@ impl<T> Router<T> {
     }
 
     pub fn recognize<'a>(&'a self, mut path: &str) -> Result<Match<&'a T>, String> {
-        if path.len() != 0 && path.as_bytes()[0] == b'/' {
+        if !path.is_empty() && path.as_bytes()[0] == b'/' {
             path = &path[1..];
         }
 

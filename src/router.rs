@@ -10,6 +10,12 @@ pub struct EightFishRouter {
     router: InnerRouter,
 }
 
+impl Default for EightFishRouter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EightFishRouter {
     pub fn new() -> EightFishRouter {
         EightFishRouter {

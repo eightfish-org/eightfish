@@ -6,7 +6,7 @@ use crate::handler::EightFishHandler;
 use crate::request::{Method, EightFishRequest};
 use crate::response::EightFishResponse;
 
-use crate::recognizer::{Router as Recognizer, Match, Params};
+use crate::recognizer::{Router as Recognizer, Match};
 
 /// `Router` provides an interface for creating complex routes as middleware
 /// for the Iron framework.
@@ -15,6 +15,12 @@ pub struct Router {
     routers: HashMap<Method, Recognizer<Arc<Box<dyn EightFishHandler>>>>,
     // Routes that accept any method.
     wildcard: Recognizer<Arc<Box<dyn EightFishHandler>>>,
+}
+
+impl Default for Router {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Router {
