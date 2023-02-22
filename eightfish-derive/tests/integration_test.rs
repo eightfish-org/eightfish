@@ -57,7 +57,7 @@ fn test_insert_sql() {
 #[test]
 fn test_update_sql() {
     assert_eq!(
-        "UPDATE foo SET id = $2, title = $3, content = $4 WHERE id = $1",
+        "UPDATE foo SET id = $1, title = $2, content = $3 WHERE id = $1",
         Foo::build_update_sql()
     );
 }
@@ -154,7 +154,7 @@ fn test_build_update_sql_and_params() {
     let (statement, params) = f.build_update_sql_and_params();
 
     assert_eq!(
-        "UPDATE foo SET id = $2, title = $3, content = $4 WHERE id = $1",
+        "UPDATE foo SET id = $1, title = $2, content = $3 WHERE id = $1",
         statement
     );
     assert!(matches!(params[0], ParameterValue::Str(id)));
@@ -220,7 +220,7 @@ fn test_struct_names_placeholder() {
 #[test]
 fn test_struct_names_update_placeholder() {
     assert_eq!(
-        "id = $2, title = $3, content = $4",
+        "id = $1, title = $2, content = $3",
         Foo::update_placeholders()
     );
 }
