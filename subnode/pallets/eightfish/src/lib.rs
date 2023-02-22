@@ -120,7 +120,7 @@ pub mod pallet {
             let block_time: u64 = T::TimeProvider::now().as_secs();
 
             // Write the id-hash pair into each StorageMap, according to the model name
-            ModelIdHashDoubleMap::<T>::set(model.clone(), id.clone(), hash.clone());
+            ModelIdHashDoubleMap::<T>::set(model.clone(), id.clone(), hash);
 
             let action = "update_index".as_bytes().to_vec();
 
@@ -186,7 +186,7 @@ pub mod pallet {
                     return false;
                 }
             }
-            return true;
+            true
         }
 
         /// Inner helper function, for increase the nonce used by generating a on-chan random vector.
