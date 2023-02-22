@@ -1,5 +1,4 @@
 #![allow(unreachable_code)]
-use std::fmt;
 use futures::StreamExt;
 use sp_keyring::AccountKeyring;
 //use std::time::Duration;
@@ -7,7 +6,7 @@ use subxt::{
     tx::PairSigner,
     OnlineClient,
     PolkadotConfig,
-    SubstrateConfig,
+    //SubstrateConfig,
 };
 use subxt::rpc::{ rpc_params, RpcParams };
 
@@ -35,13 +34,12 @@ pub struct Payload {
     reqdata: Option<PairList>,
 }
 
-#[derive(Deserialize, Debug)]
-pub struct ExtPayload {
-    time: u64,
-    nonce: u64,
-    randomvec: Vec<u8>,
-}
-
+//#[derive(Deserialize, Debug)]
+//pub struct ExtPayload {
+//    time: u64,
+//    nonce: u64,
+//    randomvec: Vec<u8>,
+//}
 
 #[subxt::subxt(runtime_metadata_path = "metadata.scale")]
 pub mod substrate {}
@@ -106,7 +104,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let model = String::from_utf8(ev.0.clone()).unwrap();
                 let action = String::from_utf8(ev.1.clone()).unwrap();
                 let data = String::from_utf8(ev.2.clone()).unwrap();
-                let time = ev.3;
+                let _time = ev.3;
 
                 let v: Vec<&str> = data.split(':').collect();
                 println!("IndexUpdated event: v: {:?}", v);
