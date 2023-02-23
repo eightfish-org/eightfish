@@ -1,4 +1,4 @@
-use crate as pallet_template;
+pub use crate as pallet_template;
 use frame_support::traits::{ConstU16, ConstU64};
 use frame_system as system;
 use sp_core::H256;
@@ -18,7 +18,7 @@ frame_support::construct_runtime!(
 		UncheckedExtrinsic = UncheckedExtrinsic,
 	{
 		System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
-        Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
+		Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
 		RandomnessCollectiveFlip: pallet_randomness_collective_flip::{Pallet},
 		TemplateModule: pallet_template::{Pallet, Call, Storage, Event<T>},
 	}
@@ -52,18 +52,18 @@ impl system::Config for Test {
 }
 
 impl pallet_timestamp::Config for Test {
-    type Moment = u64;
-    type OnTimestampSet = ();
-    type MinimumPeriod = ();
-    type WeightInfo = ();
+	type Moment = u64;
+	type OnTimestampSet = ();
+	type MinimumPeriod = ();
+	type WeightInfo = ();
 }
 
 impl pallet_randomness_collective_flip::Config for Test {}
 
 impl pallet_template::Config for Test {
 	type Event = Event;
-    type TimeProvider = pallet_timestamp::Pallet<Test>;
-    type MyRandomness = pallet_randomness_collective_flip::Pallet<Test>;
+	type TimeProvider = pallet_timestamp::Pallet<Test>;
+	type MyRandomness = pallet_randomness_collective_flip::Pallet<Test>;
 }
 
 // Build genesis storage according to the mock runtime.
