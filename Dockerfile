@@ -4,7 +4,7 @@ WORKDIR /root/eightfish
 COPY . .
 
 RUN apt update
-RUN apt install -y sudo build-essential git clang curl libssl-dev llvm libudev-dev make protobuf-compiler pkg-config
+RUN apt install -y sudo build-essential clang curl libssl-dev llvm libudev-dev make protobuf-compiler pkg-config
 
 RUN rustup update nightly
 RUN rustup target add wasm32-unknown-unknown --toolchain nightly
