@@ -16,3 +16,8 @@ RUN cargo install hurl
 
 RUN apt install -y redis-server redis-tools
 RUN apt install -y postgresql && ./init_pg.sh
+
+EXPOSE 9933
+EXPOSE 9944
+EXPOSE 30333
+
