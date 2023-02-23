@@ -21,5 +21,3 @@ bs58 = "0.4.0"
 
 eightfish = {path="../"}
 
-
-[workspace]

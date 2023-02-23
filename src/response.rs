@@ -1,4 +1,4 @@
-use serde::{Serialize};
+use serde::Serialize;
 
 /// Response status
 #[derive(Clone, Debug)]

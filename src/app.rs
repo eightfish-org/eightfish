@@ -18,11 +18,11 @@ pub enum Error {
     //Forbidden,                   // 403
     //Break(String),               // 400
     InternalServerError(String), // 500
-    //Found(String),               // 301
-    //TemporaryRedirect(String),   // 307
-    //Custom(String),
-    //CustomHtml(String),
-    //CustomJson(String),
+                                 //Found(String),               // 301
+                                 //TemporaryRedirect(String),   // 307
+                                 //Custom(String),
+                                 //CustomHtml(String),
+                                 //CustomJson(String),
 }
 
 /// EightFish result struct
@@ -52,7 +52,6 @@ pub trait EightFishModule: Sync + Send {
     /// module router method, used to write router collection of this module here
     fn router(&self, router: &mut EightFishRouter) -> Result<()>;
 }
-
 
 /// EightFish app struct
 pub struct EightFishApp {
@@ -143,7 +142,6 @@ impl EightFishApp {
 
         self
     }
-
 }
 
 impl EightFishHandler for EightFishApp {
@@ -154,20 +152,18 @@ impl EightFishHandler for EightFishApp {
         // pass req to router, execute matched biz handler
         self.router.handle_method(req, &path)
 
-/*            
-        match response {
-            Ok(res) => {
-                Ok(res)
-            }
-            Err(Error::NotFound) => {
-            }
-            Err(Error::InternalServerError(info)) => {
-            }
-            Err(_) => {
-            }
-        }
-*/
-
+        /*
+                match response {
+                    Ok(res) => {
+                        Ok(res)
+                    }
+                    Err(Error::NotFound) => {
+                    }
+                    Err(Error::InternalServerError(info)) => {
+                    }
+                    Err(_) => {
+                    }
+                }
+        */
     }
 }
-

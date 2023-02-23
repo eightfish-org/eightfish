@@ -1,15 +1,9 @@
 #![allow(dead_code)]
-use bytes::Bytes;
 use anyhow::Result;
-use spin_sdk::{redis_component};
+use bytes::Bytes;
+use spin_sdk::redis_component;
 
-use eightfish::{
-    App as EightFishApp,
-    GlobalFilter,
-    Request,
-    Response,
-    Result as EightFishResult,
-};
+use eightfish::{App as EightFishApp, GlobalFilter, Request, Response, Result as EightFishResult};
 
 mod article;
 
@@ -44,4 +38,3 @@ fn on_message(message: Bytes) -> Result<()> {
 
     Ok(())
 }
-

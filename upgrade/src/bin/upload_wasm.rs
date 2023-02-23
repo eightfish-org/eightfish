@@ -2,11 +2,7 @@ use std::fs::File;
 use std::io::prelude::*;
 
 use sp_keyring::AccountKeyring;
-use subxt::{
-    tx::PairSigner,
-    OnlineClient,
-    SubstrateConfig,
-};
+use subxt::{tx::PairSigner, OnlineClient, SubstrateConfig};
 
 #[subxt::subxt(runtime_metadata_path = "../subxtproxy/metadata.scale")]
 pub mod substrate {}
@@ -29,9 +25,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Wasm file content length: {}", contents.len());
 
     // Create a transaction to submit:
-    let tx = substrate::tx()
-        .eight_fish_module()
-        .wasm_upgrade(contents);
+    let tx = substrate::tx().eight_fish_module().wasm_upgrade(contents);
 
     // Submit the transaction with default params:
     let hash = api.tx().sign_and_submit_default(&tx, &signer).await?;

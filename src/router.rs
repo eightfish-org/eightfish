@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::request::Method;
 use crate::handler::EightFishHandler;
+use crate::request::Method;
 
 type InnerRouter = HashMap<Method, Vec<(&'static str, Arc<Box<dyn EightFishHandler>>)>>;
 
@@ -24,7 +24,12 @@ impl EightFishRouter {
     }
 
     /// basic router method
-    pub fn route<H>(&mut self, method: Method, glob: &'static str, handler: H) -> &mut EightFishRouter
+    pub fn route<H>(
+        &mut self,
+        method: Method,
+        glob: &'static str,
+        handler: H,
+    ) -> &mut EightFishRouter
     where
         H: EightFishHandler + 'static,
     {

@@ -136,10 +136,7 @@ pub struct Match<T> {
 
 impl<T> Match<T> {
     pub fn new(handler: T, params: Params) -> Match<T> {
-        Match {
-            handler,
-            params,
-        }
+        Match { handler, params }
     }
 }
 

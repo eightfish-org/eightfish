@@ -31,7 +31,7 @@ impl CharSet {
             self.high_mask |= bit;
         } else {
             let bit = 1 << val;
-            self.low_mask |=  bit;
+            self.low_mask |= bit;
         }
     }
 
@@ -199,10 +199,7 @@ pub struct Match<'a> {
 
 impl<'a> Match<'a> {
     pub fn new<'b>(state: usize, captures: Vec<&'b str>) -> Match<'b> {
-        Match {
-            state,
-            captures,
-        }
+        Match { state, captures }
     }
 }
 
@@ -398,7 +395,9 @@ fn capture<T>(
         thread.start_capture(pos);
     }
 
-    if thread.capture_begin.is_some() && nfa.end_capture[current_state] && next_state > current_state
+    if thread.capture_begin.is_some()
+        && nfa.end_capture[current_state]
+        && next_state > current_state
     {
         thread.end_capture(pos);
     }

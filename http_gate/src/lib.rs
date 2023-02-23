@@ -1,14 +1,14 @@
 #![allow(unused_assignments)]
 
 use anyhow::{anyhow, Result};
-use spin_sdk::{
-    http::{Request, Response,},
-    http_component, redis
-};
+use bytes::Bytes;
 use http::Method;
 use serde_json::json;
+use spin_sdk::{
+    http::{Request, Response},
+    http_component, redis,
+};
 use uuid::Uuid;
-use bytes::Bytes;
 
 const REDIS_ADDRESS_ENV: &str = "REDIS_URL";
 
@@ -17,8 +17,8 @@ const REDIS_ADDRESS_ENV: &str = "REDIS_URL";
 fn http_gate(req: Request) -> Result<Response> {
     println!("req: {:?}", req);
 
-    let redis_addr= std::env::var(REDIS_ADDRESS_ENV)?;
-    
+    let redis_addr = std::env::var(REDIS_ADDRESS_ENV)?;
+
     let uri = req.uri();
     let path = uri.path().to_owned();
 
@@ -42,19 +42,17 @@ fn http_gate(req: Request) -> Result<Response> {
                 }
                 None => {
                     reqdata = None;
-                }   
+                }
             }
-
         }
         _ => {
             // handle cases of other directives
-
         }
     };
 
     // We can do the unified authentication for some actions here
     // depends on path, method, and reqdata
-    // XXX: 
+    // XXX:
 
     // use a unique way to generate a reqid
     let reqid = Uuid::new_v4().simple().to_string();
@@ -78,10 +76,18 @@ fn http_gate(req: Request) -> Result<Response> {
 
     if &method == "post" {
         // send to subxt proxy to handle
-        _ = redis::publish(&redis_addr, "spin2proxy", &serde_json::to_vec(&json_to_send).unwrap());
+        _ = redis::publish(
+            &redis_addr,
+            "spin2proxy",
+            &serde_json::to_vec(&json_to_send).unwrap(),
+        );
     } else if &method == "query" {
         // send to spin_redis_worker to handle
-        _ = redis::publish(&redis_addr, "proxy2spin", &serde_json::to_vec(&json_to_send).unwrap());
+        _ = redis::publish(
+            &redis_addr,
+            "proxy2spin",
+            &serde_json::to_vec(&json_to_send).unwrap(),
+        );
     }
 
     let mut loop_count = 1;
@@ -100,13 +106,12 @@ fn http_gate(req: Request) -> Result<Response> {
                 loop_count += 1;
 
                 //println!("loop continue {}...", loop_count);
-            }
-            else {
+            } else {
                 println!("timeout, return 500");
                 // timeout handler, use which http status code?
                 return Ok(http::Response::builder()
-                          .status(500)
-                          .body(Some("No data".into()))?);
+                    .status(500)
+                    .body(Some("No data".into()))?);
             }
         } else {
             // Now we get the raw serialized result from worker, we suppose it use
@@ -118,11 +123,9 @@ fn http_gate(req: Request) -> Result<Response> {
 
             // jump out this loop, and return the response to user
             return Ok(http::Response::builder()
-                      .status(200)
-                      .header("eightfish_version", "0.1")
-                      .body(Some(Bytes::from(result)))?);
-
+                .status(200)
+                .header("eightfish_version", "0.1")
+                .body(Some(Bytes::from(result)))?);
         }
     }
 }
-
