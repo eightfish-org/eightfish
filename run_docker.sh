@@ -1,1 +1,1 @@
-sudo docker run -it eightfish-docker bash
+docker run -it eightfish-docker bash
