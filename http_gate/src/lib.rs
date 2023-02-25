@@ -45,8 +45,20 @@ fn http_gate(req: Request) -> Result<Response> {
                 }
             }
         }
+        &Method::OPTIONS => {
+            return Ok(http::Response::builder()
+                .status(200)
+                .header("eightfish_version", "0.1")
+                .header("Access-Control-Allow-Origin", "*")
+                .header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+                .header("Access-Control-Allow-Headers", "X-PINGOTHER, Content-Type")
+                .body(Some("No data".into()))?);
+        }
         _ => {
             // handle cases of other directives
+            return Ok(http::Response::builder()
+                .status(500)
+                .body(Some("No data".into()))?);
         }
     };
 
@@ -111,6 +123,7 @@ fn http_gate(req: Request) -> Result<Response> {
                 // timeout handler, use which http status code?
                 return Ok(http::Response::builder()
                     .status(500)
+                    .header("Access-Control-Allow-Origin", "*")
                     .body(Some("No data".into()))?);
             }
         } else {
@@ -125,6 +138,7 @@ fn http_gate(req: Request) -> Result<Response> {
             return Ok(http::Response::builder()
                 .status(200)
                 .header("eightfish_version", "0.1")
+                .header("Access-Control-Allow-Origin", "*")
                 .body(Some(Bytes::from(result)))?);
         }
     }
