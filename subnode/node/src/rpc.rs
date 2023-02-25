@@ -7,8 +7,8 @@
 
 use std::sync::Arc;
 
-use jsonrpsee::RpcModule;
 use eightfish_runtime::{opaque::Block, AccountId, Balance, Index};
+use jsonrpsee::RpcModule;
 use sc_transaction_pool_api::TransactionPool;
 use sp_api::ProvideRuntimeApi;
 use sp_block_builder::BlockBuilder;
@@ -40,10 +40,10 @@ where
 	C::Api: BlockBuilder<Block>,
 	P: TransactionPool + 'static,
 {
+	use eightfish_rpc::{EightFish, EightFishRpcServer};
 	use pallet_transaction_payment_rpc::{TransactionPayment, TransactionPaymentApiServer};
 	use substrate_frame_rpc_system::{System, SystemApiServer};
-	use eightfish_rpc::{EightFish, EightFishRpcServer};
-    
+
 	let mut module = RpcModule::new(());
 	let FullDeps { client, pool, deny_unsafe } = deps;
 

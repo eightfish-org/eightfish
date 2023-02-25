@@ -265,9 +265,9 @@ impl pallet_sudo::Config for Runtime {
 /// Configure the pallet-template in pallets/template.
 impl pallet_eightfish::Config for Runtime {
 	type Event = Event;
-    //type TimeProvider = pallet_timestamp::Pallet<Runtime>;
-    type TimeProvider = Timestamp;
-    type MyRandomness = RandomnessCollectiveFlip;
+	//type TimeProvider = pallet_timestamp::Pallet<Runtime>;
+	type TimeProvider = Timestamp;
+	type MyRandomness = RandomnessCollectiveFlip;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
@@ -467,12 +467,12 @@ impl_runtime_apis! {
 	}
 
 
-    // The runtime api from eightfish module
-    impl eightfish_runtime_api::EightFishApi<Block> for Runtime {
+	// The runtime api from eightfish module
+	impl eightfish_runtime_api::EightFishApi<Block> for Runtime {
 		fn check_pair_list(model: Vec<u8>, list: Vec<(Vec<u8>, Vec<u8>)>) -> bool {
-            EightFishModule::check_pair_list(model, list)
-        }
-    }
+			EightFishModule::check_pair_list(model, list)
+		}
+	}
 
 
 	#[cfg(feature = "runtime-benchmarks")]

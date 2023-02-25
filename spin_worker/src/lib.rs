@@ -1,20 +1,17 @@
 #![allow(dead_code)]
-use std::collections::HashMap;
-use anyhow::{Result, anyhow, bail};
+use anyhow::{anyhow, bail, Result};
 use bytes::Bytes;
-use spin_sdk::{
-    redis, 
-    pg::{self, Decode},
-};
-use serde::{Serialize, Deserialize};
-use serde_json::json;
 use eightfish::{
-    Method, 
-    Handler,
-    App as EightFishApp, 
-    Request as EightFishRequest, 
+    App as EightFishApp, Handler, Method, Request as EightFishRequest,
     Response as EightFishResponse,
 };
+use serde::Deserialize;
+use serde_json::json;
+use spin_sdk::{
+    pg::{self, Decode},
+    redis,
+};
+use std::collections::HashMap;
 
 const REDIS_URL_ENV: &str = "REDIS_URL";
 const DB_URL_ENV: &str = "DB_URL";
@@ -22,7 +19,6 @@ const TMP_CACHE_RESULTS: &str = "tmp:cache:#";
 const CACHE_STATUS_RESULTS: &str = "cache:status:#";
 const CACHE_RESULTS: &str = "cache:#";
 const CHANNEL_SPIN2PROXY: &str = "spin2proxy";
-
 
 #[derive(Deserialize, Debug)]
 pub struct InputOutputObject {
@@ -45,20 +41,16 @@ pub struct ExtPayload {
     randomvec: Vec<u8>,
 }
 
-
 pub struct Worker {
-    app: EightFishApp,    
+    app: EightFishApp,
 }
 
 impl Worker {
     pub fn mount(app: EightFishApp) -> Self {
-        Worker {
-            app
-        }
+        Worker { app }
     }
 
     pub fn work(self, message: Bytes) -> Result<()> {
-
         let msg_obj: InputOutputObject = serde_json::from_slice(&message)?;
         println!("Worker::work: msg_obj: {:?}", msg_obj);
 
@@ -70,7 +62,7 @@ impl Worker {
                 let path = msg_obj.model.to_owned();
                 let payload: Payload = serde_json::from_slice(&msg_obj.data)?;
                 let reqid = payload.reqid.to_owned();
-                let reqdata = payload.reqdata.to_owned();
+                let reqdata = payload.reqdata;
 
                 let mut ef_req = EightFishRequest::new(method, path, reqdata);
                 println!("Worker::work: in query branch: ef_req");
@@ -82,7 +74,7 @@ impl Worker {
                 let ef_res = ef_res.unwrap();
                 println!("Worker::work: in query branch: ef_res: {:?}", ef_res);
 
-                // we check the intermediate result  in the framework internal 
+                // we check the intermediate result  in the framework internal
                 let pair_list = inner_stuffs_on_query_result(&reqid, &ef_res).unwrap();
                 println!("Worker::work: in query branch: pair_list: {:?}", pair_list);
 
@@ -91,7 +83,6 @@ impl Worker {
                 // but that will force the developer use a strict unified url shcema in his product
                 // the names in query and post must MATCH
                 tail_query_process(&redis_addr, &reqid, &modelname, &pair_list);
-
             }
             "post" => {
                 let redis_addr = std::env::var(REDIS_URL_ENV)?;
@@ -99,21 +90,27 @@ impl Worker {
                 let path = msg_obj.model.to_owned();
                 let payload: Payload = serde_json::from_slice(&msg_obj.data)?;
                 let reqid = payload.reqid.to_owned();
-                let reqdata = payload.reqdata.to_owned();
+                let reqdata = payload.reqdata;
                 let ext: ExtPayload = serde_json::from_slice(&msg_obj.ext)?;
 
                 let mut ef_req = EightFishRequest::new(method, path, reqdata);
                 println!("Worker::work: in post branch: ef_req");
 
                 // add time to req.ext
-                ef_req.ext_mut().insert("time".to_string(), ext.time.to_string());
+                ef_req
+                    .ext_mut()
+                    .insert("time".to_string(), ext.time.to_string());
                 // add nonce to req.ext
-                ef_req.ext_mut().insert("nonce".to_string(), ext.nonce.to_string());
+                ef_req
+                    .ext_mut()
+                    .insert("nonce".to_string(), ext.nonce.to_string());
                 // encode the vec<u8> as hex string, each byte to 2 bchar. And add randomvec to req.ext
                 //let random_string = hex::encode(&ext.randomvec);
                 // encode the vec<u8> as base58 string, and add random_str to req.ext
                 let random_string = bs58::encode(&ext.randomvec).into_string();
-                ef_req.ext_mut().insert("random_str".to_string(), random_string);
+                ef_req
+                    .ext_mut()
+                    .insert("random_str".to_string(), random_string);
 
                 let ef_res = self.app.handle(&mut ef_req);
                 if ef_res.is_err() {
@@ -141,21 +138,20 @@ impl Worker {
                 let payload: Payload = serde_json::from_slice(&msg_obj.data)?;
                 println!("callback: update_index: payload: {:?}", payload);
                 let reqid = payload.reqid.to_owned();
-                let id = payload.reqdata.to_owned().unwrap();
+                let id = payload.reqdata.unwrap();
 
                 let result = json!({
                     "result": "Ok",
                     "id": id,
                 });
-                
+
                 // while getting the index updated callback, we put result http_gate wants into redis
                 // cache
                 let redis_addr = std::env::var(REDIS_URL_ENV)?;
                 let cache_key = CACHE_STATUS_RESULTS.replace('#', &reqid);
                 _ = redis::set(&redis_addr, &cache_key, b"true");
                 let cache_key = CACHE_RESULTS.replace('#', &reqid);
-                _ = redis::set(&redis_addr, &cache_key, &result.to_string().as_bytes()); 
-
+                _ = redis::set(&redis_addr, &cache_key, result.to_string().as_bytes());
             }
             "check_pair_list" => {
                 let redis_addr = std::env::var(REDIS_URL_ENV)?;
@@ -163,40 +159,53 @@ impl Worker {
                 // handle the result of the check_pair_list
                 let payload: Payload = serde_json::from_slice(&msg_obj.data)?;
                 let reqid = payload.reqid.clone();
-                let reqdata = payload.reqdata.clone().unwrap();
+                let reqdata = payload.reqdata.unwrap();
 
                 if &reqdata == "true" {
                     // check pass, get content from the tmp cache and write this content to a cache
                     let tmpdata = redis::get(&redis_addr, &TMP_CACHE_RESULTS.replace('#', &reqid));
-                    _ = redis::set(&redis_addr, &CACHE_STATUS_RESULTS.replace('#', &reqid), b"true");
-                    if tmpdata.is_ok() {
-                        let _ = redis::set(&redis_addr, &CACHE_RESULTS.replace('#', &reqid), &tmpdata.unwrap());
+                    _ = redis::set(
+                        &redis_addr,
+                        &CACHE_STATUS_RESULTS.replace('#', &reqid),
+                        b"true",
+                    );
+                    if let Ok(tmpdata) = tmpdata {
+                        let _ =
+                            redis::set(&redis_addr, &CACHE_RESULTS.replace('#', &reqid), &tmpdata);
                     }
                     // delete the tmp cache
                     _ = redis::del(&redis_addr, &[&TMP_CACHE_RESULTS.replace('#', &reqid)]);
-                }
-                else {
-                    _ = redis::set(&redis_addr, &CACHE_STATUS_RESULTS.replace('#', &reqid), b"false");
+                } else {
+                    _ = redis::set(
+                        &redis_addr,
+                        &CACHE_STATUS_RESULTS.replace('#', &reqid),
+                        b"false",
+                    );
                     let data = "check of pair list wrong!";
-                    _ = redis::set(&redis_addr, &CACHE_RESULTS.replace('#', &reqid), &data.as_bytes());
+                    _ = redis::set(
+                        &redis_addr,
+                        &CACHE_RESULTS.replace('#', &reqid),
+                        data.as_bytes(),
+                    );
                     // clear another tmp cache key
                     _ = redis::del(&redis_addr, &[&TMP_CACHE_RESULTS.replace('#', &reqid)]);
-
                 }
             }
             &_ => {
                 todo!()
-            }   
+            }
         }
 
         Ok(())
     }
-
 }
 
-
-
-fn tail_query_process(redis_addr: &str, reqid: &str, modelname: &str, pair_list: &Vec<(String, String)>) {
+fn tail_query_process(
+    redis_addr: &str,
+    reqid: &str,
+    modelname: &str,
+    pair_list: &Vec<(String, String)>,
+) {
     let payload = json!({
         "reqid": reqid,
         "reqdata": Some(pair_list),
@@ -212,10 +221,19 @@ fn tail_query_process(redis_addr: &str, reqid: &str, modelname: &str, pair_list:
     });
 
     // send this to the redis channel to subxt to query rpc
-    _ = redis::publish(&redis_addr, CHANNEL_SPIN2PROXY, &json_to_send.to_string().as_bytes());
+    _ = redis::publish(
+        redis_addr,
+        CHANNEL_SPIN2PROXY,
+        json_to_send.to_string().as_bytes(),
+    );
 }
 
-fn tail_post_process(redis_addr: &str, reqid: &str, modelname: &str, pair_list: &Vec<(String, String)>) {
+fn tail_post_process(
+    redis_addr: &str,
+    reqid: &str,
+    modelname: &str,
+    pair_list: &Vec<(String, String)>,
+) {
     let payload = json!({
         "reqid": reqid,
         "reqdata": Some(pair_list),
@@ -229,23 +247,32 @@ fn tail_post_process(redis_addr: &str, reqid: &str, modelname: &str, pair_list: 
         "ext": Vec::<u8>::new(),
     });
 
-    _ = redis::publish(&redis_addr, CHANNEL_SPIN2PROXY, &json_to_send.to_string().as_bytes());
-
+    _ = redis::publish(
+        redis_addr,
+        CHANNEL_SPIN2PROXY,
+        json_to_send.to_string().as_bytes(),
+    );
 }
 
-
-fn inner_stuffs_on_query_result(reqid: &str, res: &EightFishResponse) -> Result<Vec<(String, String)>> {
+fn inner_stuffs_on_query_result(
+    reqid: &str,
+    res: &EightFishResponse,
+) -> Result<Vec<(String, String)>> {
     let pg_addr = std::env::var(DB_URL_ENV)?;
     let redis_addr = std::env::var(REDIS_URL_ENV)?;
     let table_name = &res.info().model_name;
     let pair_list = res.pair_list().clone().unwrap();
     // get the id list from obj list
-    let ids: Vec<String> = pair_list.iter().map(|(id, hash)| String::new() + "'" + &id + "'").collect();
+    let ids: Vec<String> = pair_list
+        .iter()
+        .map(|(id, _)| String::new() + "'" + id + "'")
+        .collect();
     let ids_string = ids.join(",");
 
-    let query_string = format!("select id, hash from {table_name}_idhash where id in ({ids_string})");
+    let query_string =
+        format!("select id, hash from {table_name}_idhash where id in ({ids_string})");
     println!("query_string: {:?}", query_string);
-    let rowset = pg::query(&pg_addr, &query_string, &vec![]).unwrap();
+    let rowset = pg::query(&pg_addr, &query_string, &[]).unwrap();
 
     let mut idhash_map: HashMap<String, String> = HashMap::new();
     for row in rowset.rows {
@@ -267,7 +294,11 @@ fn inner_stuffs_on_query_result(reqid: &str, res: &EightFishResponse) -> Result<
     println!("res.results: {:?}", res.results());
     // store to cache for http gate to retrieve
     let data_to_cache = res.results().clone().unwrap_or("".to_string());
-    _ = redis::set(&redis_addr, &TMP_CACHE_RESULTS.replace('#', &reqid), &data_to_cache.as_bytes());
+    _ = redis::set(
+        &redis_addr,
+        &TMP_CACHE_RESULTS.replace('#', reqid),
+        data_to_cache.as_bytes(),
+    );
 
     Ok(pair_list.to_vec())
 }
@@ -277,44 +308,49 @@ fn inner_stuffs_on_post_result(res: &EightFishResponse) -> Result<Vec<(String, S
     let table_name = &res.info().model_name;
     //let id = &res.info.target;
     let action = &res.info().action;
-    let mut id = String::new();
-    let mut ins_hash = String::new();
-    
+    let id;
+    let ins_hash;
+
     if res.pair_list().is_some() {
         // here, we just process single updated item returning
         let pair = &res.pair_list().clone().unwrap()[0];
         id = pair.0.clone();
         ins_hash = pair.1.clone();
-    }
-    else {
-        return bail!("No pair.".to_string());
+    } else {
+        bail!("No pair.".to_string());
     }
 
-    if action == "new"{
-        let sql_string = format!("insert into {table_name}_idhash values ('{}', '{}')", id, ins_hash);
-        let _execute_results = pg::execute(&pg_addr, &sql_string, &vec![]);
+    if action == "new" {
+        let sql_string = format!(
+            "insert into {table_name}_idhash values ('{}', '{}')",
+            id, ins_hash
+        );
+        let _execute_results = pg::execute(&pg_addr, &sql_string, &[]);
         // TODO: check the pg result
-        println!("in post stuff: new: _execute_results: {:?}", _execute_results);
-
+        println!(
+            "in post stuff: new: _execute_results: {:?}",
+            _execute_results
+        );
     } else if action == "update" {
-        let sql_string = format!("update {table_name}_idhash set hash='{ins_hash}' where id='{id}'");
-        let _execute_results = pg::execute(&pg_addr, &sql_string, &vec![]);
-        println!("in post stuff: update: _execute_results: {:?}", _execute_results);
-
+        let sql_string =
+            format!("update {table_name}_idhash set hash='{ins_hash}' where id='{id}'");
+        let _execute_results = pg::execute(&pg_addr, &sql_string, &[]);
+        println!(
+            "in post stuff: update: _execute_results: {:?}",
+            _execute_results
+        );
     } else if action == "delete" {
         let sql_string = format!("delete {table_name}_idhash where id='{id}'");
-        let _execute_results = pg::execute(&pg_addr, &sql_string, &vec![]);
+        let _execute_results = pg::execute(&pg_addr, &sql_string, &[]);
         // TODO: check the pg result
-        println!("in post stuff: delete: _execute_results: {:?}", _execute_results);
+        println!(
+            "in post stuff: delete: _execute_results: {:?}",
+            _execute_results
+        );
+    } else {
     }
-    else {
 
-    }
-
-    let mut pair_list: Vec<(String, String)> = vec![];
-    pair_list.push((id, ins_hash));
+    let pair_list: Vec<(String, String)> = vec![(id, ins_hash)];
 
     Ok(pair_list)
 }
-
-

@@ -3,10 +3,10 @@ use std::sync::Arc;
 
 use crate::app::{Error, Result};
 use crate::handler::EightFishHandler;
-use crate::request::{Method, EightFishRequest};
+use crate::request::{EightFishRequest, Method};
 use crate::response::EightFishResponse;
 
-use crate::recognizer::{Router as Recognizer, Match, Params};
+use crate::recognizer::{Match, Router as Recognizer};
 
 /// `Router` provides an interface for creating complex routes as middleware
 /// for the Iron framework.
@@ -15,6 +15,12 @@ pub struct Router {
     routers: HashMap<Method, Recognizer<Arc<Box<dyn EightFishHandler>>>>,
     // Routes that accept any method.
     wildcard: Recognizer<Arc<Box<dyn EightFishHandler>>>,
+}
+
+impl Default for Router {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Router {
@@ -98,7 +104,11 @@ impl Router {
     //     )
     // }
 
-    pub fn handle_method(&self, req: &mut EightFishRequest, path: &str) -> Result<EightFishResponse> {
+    pub fn handle_method(
+        &self,
+        req: &mut EightFishRequest,
+        path: &str,
+    ) -> Result<EightFishResponse> {
         if let Some(matched) = self.recognize(&req.method(), path) {
             // extract the url-inner params to req.ext hashmap
             for (key, val) in matched.params.iter() {

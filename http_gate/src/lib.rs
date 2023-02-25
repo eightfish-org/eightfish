@@ -24,17 +24,14 @@ fn http_gate(req: Request) -> Result<Response> {
 
     let mut method = String::new();
     let mut reqdata: Option<String> = None;
-    match req.method() {
-        &Method::GET => {
+    match *req.method() {
+        Method::GET => {
             method = "query".to_owned();
 
             // In query mode: data is the url params
-            reqdata = match uri.query() {
-                Some(query) => Some(query.to_string()),
-                None => None,
-            }
+            reqdata = uri.query().map(|query| query.to_string());
         }
-        &Method::POST => {
+        Method::POST => {
             method = "post".to_owned();
 
             // In post mode: data is the body content of the request

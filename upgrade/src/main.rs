@@ -1,13 +1,12 @@
-use tokio::time;
 use tokio::fs::File;
-use tokio::io::AsyncWriteExt; 
-use tokio_stream::{StreamExt};
+use tokio::io::AsyncWriteExt;
+use tokio::time;
+use tokio_stream::StreamExt;
 
 use redis::AsyncCommands;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
-
 
 const UPGRADE2PROXYCHANNEL: &str = "spin2proxy";
 const PROXY2UPGRADECHANNEL: &str = "proxy2upgrade";
@@ -39,7 +38,11 @@ async fn do_task() {
     // create redis connections
     let redis_client = redis::Client::open(redis_addr).unwrap();
     let mut redis_conn = redis_client.get_async_connection().await.unwrap();
-    let mut pubsub_conn = redis_client.get_async_connection().await.unwrap().into_pubsub();
+    let mut pubsub_conn = redis_client
+        .get_async_connection()
+        .await
+        .unwrap()
+        .into_pubsub();
     pubsub_conn.subscribe(PROXY2UPGRADECHANNEL).await.unwrap();
     let mut pubsub_stream = pubsub_conn.on_message();
 
@@ -51,7 +54,8 @@ async fn do_task() {
         "ext": Vec::<u8>::new(),
     });
     let trans_string = json_to_send.to_string();
-    let _: Result<String, redis::RedisError> = redis_conn.publish(UPGRADE2PROXYCHANNEL, trans_string).await;
+    let _: Result<String, redis::RedisError> =
+        redis_conn.publish(UPGRADE2PROXYCHANNEL, trans_string).await;
 
     // wait for the checking response in asynchronization
     let msg = pubsub_stream.next().await;
@@ -68,7 +72,8 @@ async fn do_task() {
             "ext": Vec::<u8>::new(),
         });
         let trans_string = json_to_send.to_string();
-        let _: Result<String, redis::RedisError> = redis_conn.publish(UPGRADE2PROXYCHANNEL, trans_string).await;
+        let _: Result<String, redis::RedisError> =
+            redis_conn.publish(UPGRADE2PROXYCHANNEL, trans_string).await;
 
         let msg = pubsub_stream.next().await;
         println!("received msg from proxy: {:?}", msg);
@@ -88,15 +93,14 @@ async fn do_task() {
                 "ext": Vec::<u8>::new(),
             });
             let trans_string = json_to_send.to_string();
-            let _: Result<String, redis::RedisError> = redis_conn.publish(UPGRADE2PROXYCHANNEL, trans_string).await;
+            let _: Result<String, redis::RedisError> =
+                redis_conn.publish(UPGRADE2PROXYCHANNEL, trans_string).await;
 
             // currently, we don't process the returned event value of the disable_wasm_upgrade_flag call
 
             // DONE
         }
-    }
-    else {
+    } else {
         // do nothing, only log it
-
     }
 }

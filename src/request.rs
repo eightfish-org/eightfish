@@ -17,9 +17,9 @@ pub struct EightFishRequest {
 impl EightFishRequest {
     pub fn new(method: Method, path: String, data: Option<String>) -> EightFishRequest {
         EightFishRequest {
-            method: method,
-            path: path,
-            data: data,
+            method,
+            path,
+            data,
             ext: HashMap::new(),
         }
     }
@@ -53,7 +53,7 @@ impl EightFishRequest {
         let mut params: HashMap<String, String> = HashMap::new();
 
         if self.data.is_some() {
-            let _parse = form_urlencoded::parse(&self.data.as_ref().unwrap().as_bytes());
+            let _parse = form_urlencoded::parse(self.data.as_ref().unwrap().as_bytes());
             for pair in _parse {
                 let key = pair.0.to_string();
                 let val = pair.1.to_string();

@@ -1,3 +1,4 @@
+Currently there are two modules that have detailed unit test: eightfish-derive and pallet-eightfish.
 
 ## Unit Testing
 
@@ -12,6 +13,5 @@ cargo test
 
 cd eightfish-derive
 cargo test
-
 
 ```
