@@ -45,7 +45,7 @@ fn http_gate(req: Request) -> Result<Response> {
                 }
             }
         }
-        &Method::OPTIONS => {
+        Method::OPTIONS => {
             return Ok(http::Response::builder()
                 .status(200)
                 .header("eightfish_version", "0.1")
