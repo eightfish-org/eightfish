@@ -10,7 +10,7 @@ RUN rustup update nightly
 RUN rustup target add wasm32-unknown-unknown --toolchain nightly
 RUN rustup target add wasm32-wasi
 
-RUN curl -fsSL https://developer.fermyon.com/downloads/install.sh | bash && mv spin /usr/local/bin/
+RUN cd .. && curl -fsSL https://developer.fermyon.com/downloads/install.sh | bash && mv spin /usr/local/bin/
 RUN cargo install subxt-cli && cargo install hurl
 
 RUN apt install -y redis-server redis-tools

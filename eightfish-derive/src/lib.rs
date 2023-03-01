@@ -7,7 +7,7 @@ use syn::{parse_macro_input, DeriveInput};
 ///
 /// ### Usage
 ///
-/// ```ignore
+/// ```text
 /// use eightfish_derive::EightFishModel;
 ///
 /// #[derive(Debug, Clone, Serialize, Deserialize, Default, EightFishModel)]
@@ -19,7 +19,7 @@ use syn::{parse_macro_input, DeriveInput};
 /// ```
 ///
 /// ### Generated Methods
-/// ```ignore
+/// ```text
 /// impl Model {
 ///      /// get the table name of the model
 ///      fn model_name() -> String {
