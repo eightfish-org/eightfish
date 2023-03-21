@@ -8,7 +8,9 @@ This is a document for EightFish framework that introduce the features of the SD
 
 An EightFish app is actually a [Spin redis-triggered application](https://developer.fermyon.com/spin/redis-trigger). The entry of this type of application looks like:
 
-``` #[redis_component]                                                              fn on_message(message: Bytes) -> Result<()> { 
+``` 
+#[redis_component]
+fn on_message(message: Bytes) -> Result<()> { }
 ```
 
 You can look into the [example file](https://github.com/eightfish-org/eightfish/blob/master/examples/simple/src/lib.rs#L31) to learn the style.
