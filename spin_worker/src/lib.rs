@@ -78,11 +78,13 @@ impl Worker {
                 let pair_list = inner_stuffs_on_query_result(&reqid, &ef_res).unwrap();
                 println!("Worker::work: in query branch: pair_list: {:?}", pair_list);
 
-                let modelname = ef_res.info().model_name.to_owned();
-                // we can retrieve the model name from the path
-                // but that will force the developer use a strict unified url shcema in his product
-                // the names in query and post must MATCH
-                tail_query_process(&redis_addr, &reqid, &modelname, &pair_list);
+                if pair_list.is_some() {
+                    let modelname = ef_res.info().model_name.to_owned();
+                    // we can retrieve the model name from the path
+                    // but that will force the developer use a strict unified url shcema in his product
+                    // the names in query and post must MATCH
+                    tail_query_process(&redis_addr, &reqid, &modelname, &pair_list.unwrap());
+                }
             }
             "post" => {
                 let redis_addr = std::env::var(REDIS_URL_ENV)?;
@@ -257,50 +259,67 @@ fn tail_post_process(
 fn inner_stuffs_on_query_result(
     reqid: &str,
     res: &EightFishResponse,
-) -> Result<Vec<(String, String)>> {
+) -> Result<Option<Vec<(String, String)>>> {
     let pg_addr = std::env::var(DB_URL_ENV)?;
     let redis_addr = std::env::var(REDIS_URL_ENV)?;
-    let table_name = &res.info().model_name;
-    let pair_list = res.pair_list().clone().unwrap();
-    // get the id list from obj list
-    let ids: Vec<String> = pair_list
-        .iter()
-        .map(|(id, _)| String::new() + "'" + id + "'")
-        .collect();
-    let ids_string = ids.join(",");
 
-    let query_string =
-        format!("select id, hash from {table_name}_idhash where id in ({ids_string})");
-    println!("query_string: {:?}", query_string);
-    let rowset = pg::query(&pg_addr, &query_string, &[]).unwrap();
+    if res.pair_list().is_some() {
+        let table_name = &res.info().model_name;
+        let pair_list = res.pair_list().clone().unwrap();
+        // get the id list from obj list
+        let ids: Vec<String> = pair_list
+            .iter()
+            .map(|(id, _)| String::new() + "'" + id + "'")
+            .collect();
+        let ids_string = ids.join(",");
 
-    let mut idhash_map: HashMap<String, String> = HashMap::new();
-    for row in rowset.rows {
-        let id = String::decode(&row[0])?;
-        let hash = String::decode(&row[1])?;
+        let query_string =
+            format!("select id, hash from {table_name}_idhash where id in ({ids_string})");
+        println!("query_string: {:?}", query_string);
+        let rowset = pg::query(&pg_addr, &query_string, &[]).unwrap();
 
-        idhash_map.insert(id, hash);
-    }
+        let mut idhash_map: HashMap<String, String> = HashMap::new();
+        for row in rowset.rows {
+            let id = String::decode(&row[0])?;
+            let hash = String::decode(&row[1])?;
 
-    // iterate on the input results to check
-    for (id, chash) in pair_list.iter() {
-        let hash_from_map = idhash_map.get(&id[..]).expect("");
-        println!("chash, hash_from_map: {:?}, {:?}", chash, hash_from_map);
-        if chash != hash_from_map {
-            return Err(anyhow!("Hash mismatching.".to_string()));
+            idhash_map.insert(id, hash);
         }
+
+        // iterate on the input results to check
+        for (id, chash) in pair_list.iter() {
+            let hash_from_map = idhash_map.get(&id[..]).expect("");
+            println!("chash, hash_from_map: {:?}, {:?}", chash, hash_from_map);
+            if chash != hash_from_map {
+                return Err(anyhow!("Hash mismatching.".to_string()));
+            }
+        }
+
+        println!("res.results: {:?}", res.results());
+        // store to cache for http gate to retrieve
+        let data_to_cache = res.results().clone().unwrap_or("".to_string());
+        _ = redis::set(
+            &redis_addr,
+            &TMP_CACHE_RESULTS.replace('#', reqid),
+            data_to_cache.as_bytes(),
+        );
+
+        Ok(Some(pair_list.to_vec()))
+    } else {
+        let data_to_cache = res.results().clone().unwrap_or("".to_string());
+        _ = redis::set(
+            &redis_addr,
+            &CACHE_STATUS_RESULTS.replace('#', &reqid),
+            b"true",
+        );
+        _ = redis::set(
+            &redis_addr,
+            &CACHE_RESULTS.replace('#', &reqid),
+            &data_to_cache.as_bytes(),
+        );
+
+        Ok(None)
     }
-
-    println!("res.results: {:?}", res.results());
-    // store to cache for http gate to retrieve
-    let data_to_cache = res.results().clone().unwrap_or("".to_string());
-    _ = redis::set(
-        &redis_addr,
-        &TMP_CACHE_RESULTS.replace('#', reqid),
-        data_to_cache.as_bytes(),
-    );
-
-    Ok(pair_list.to_vec())
 }
 
 fn inner_stuffs_on_post_result(res: &EightFishResponse) -> Result<Vec<(String, String)>> {

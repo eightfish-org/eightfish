@@ -63,6 +63,22 @@ impl EightFishResponse {
         }
     }
 
+    pub fn from_str(
+        status: Status,
+        info: Info,
+        aresults: String,
+    ) -> EightFishResponse {
+
+        EightFishResponse {
+            status,
+            info,
+            pair_list: None,
+            results: Some(aresults),
+        }
+
+    }
+    
+
     /// get response status
     pub fn status(&self) -> Status {
         self.status.clone()
