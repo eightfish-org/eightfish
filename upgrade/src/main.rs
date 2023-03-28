@@ -16,7 +16,7 @@ pub struct InputOutputObject {
     model: String,
     action: String,
     data: Vec<u8>,
-    time: u64,
+    ext: Vec<u8>,
 }
 
 #[tokio::main]
@@ -59,9 +59,22 @@ async fn do_task() {
 
     // wait for the checking response in asynchronization
     let msg = pubsub_stream.next().await;
-    println!("received msg from proxy: {:?}", msg);
+    // println!("received msg from proxy: {:?}", msg);
     let msg_payload: Vec<u8> = msg.unwrap().get_payload().unwrap();
     let msg_obj: InputOutputObject = serde_json::from_slice(&msg_payload).unwrap();
+    println!(
+        "received msg from proxy: {}, {}, {}, {}",
+        msg_obj.model,
+        msg_obj.action,
+        if msg_obj.data.len() == 5 {
+            "false"
+        } else if msg_obj.data.len() == 4 {
+            "true"
+        } else {
+            ""
+        },
+        msg_obj.ext.len()
+    );
 
     if &msg_obj.action == "check_new_version_wasmfile" && &msg_obj.data == b"true" {
         // do the retreiving content action
@@ -76,14 +89,21 @@ async fn do_task() {
             redis_conn.publish(UPGRADE2PROXYCHANNEL, trans_string).await;
 
         let msg = pubsub_stream.next().await;
-        println!("received msg from proxy: {:?}", msg);
         let msg_payload: Vec<u8> = msg.unwrap().get_payload().unwrap();
         let msg_obj: InputOutputObject = serde_json::from_slice(&msg_payload).unwrap();
+        println!(
+            "received msg from proxy: {}, {}, {}, {}",
+            msg_obj.model,
+            msg_obj.action,
+            msg_obj.data.len(),
+            msg_obj.ext.len()
+        );
         if &msg_obj.action == "retreive_wasmfile" && !msg_obj.data.is_empty() {
             // after getting the wasm blob data, write it to the destination file, by the path got from
             // the config file
             let mut file = File::create(wasmfile_path).await.unwrap();
             file.write_all(&msg_obj.data).await.unwrap();
+            println!("write file successfully!");
 
             // disable the wasm upgrade flag
             let json_to_send = json!({

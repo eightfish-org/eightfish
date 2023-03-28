@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::prelude::*;
 
 use sp_keyring::AccountKeyring;
-use subxt::{tx::PairSigner, OnlineClient, SubstrateConfig};
+use subxt::{tx::PairSigner, OnlineClient, PolkadotConfig};
 
 #[subxt::subxt(runtime_metadata_path = "../subxtproxy/metadata.scale")]
 pub mod substrate {}
@@ -12,11 +12,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //tracing_subscriber::fmt::init();
     let key = "WASMFILE_TOUPLOAD";
     let wasmfile_path: String = dotenv::var(key).unwrap();
+    println!("Wasm file path: {}", wasmfile_path);
 
     let signer = PairSigner::new(AccountKeyring::Alice.pair());
 
     // Create a client to use:
-    let api = OnlineClient::<SubstrateConfig>::new().await?;
+    let api = OnlineClient::<PolkadotConfig>::new().await?;
 
     // read wasm file content
     let mut file = File::open(wasmfile_path)?;
