@@ -154,6 +154,13 @@ impl ArticleModule {
 
         Ok(response)
     }
+
+    fn version(_req: &mut Request) -> Result<Response> {
+        let ret = r#"{"version": 1}"#.to_string();
+        let response = Response::from_str(Status::Successful, Default::default(), ret);
+
+        Ok(response)
+    }
 }
 
 impl Module for ArticleModule {
@@ -163,6 +170,8 @@ impl Module for ArticleModule {
         router.post("/article/new", Self::new_article);
         router.post("/article/update", Self::update);
         router.post("/article/delete/:id", Self::delete);
+
+        router.get("/version", Self::version);
 
         Ok(())
     }
