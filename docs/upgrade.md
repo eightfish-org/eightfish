@@ -133,9 +133,9 @@ We will get:
 {"version": 2}
 ```
 
-As you noticed, the version has been upgrade from 1 to 2. We have done the upgrading process, yes, you can 
+As you noticed, the version has been upgraded from 1 to 2. We have done the upgrading process, yes, you can 
 get that: we use the blockchain to distribute the software, and execute it off chain. This is an awesome 
 feature of EightFish.
 
-
+You can also check the on-chain storage and events in the polkadot.js web app, that's simple as you imagined.
 
