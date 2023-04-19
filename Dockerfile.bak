@@ -1,15 +1,18 @@
-#== First stage: this is the build stage for Substrate. Here we create the binary.
-FROM docker.io/paritytech/ci-linux:production as builder
+FROM rust:1.67
 
 WORKDIR /eightfish
 COPY . .
-RUN cargo build --locked --release
+
+# install system dependecies
+RUN apt update
+RUN apt install -y sudo build-essential clang curl libssl-dev llvm libudev-dev make protobuf-compiler pkg-config
 
 # install rust components
+RUN rustup update nightly
+RUN rustup target add wasm32-unknown-unknown --toolchain nightly
 RUN rustup target add wasm32-wasi
 
 # install third tools
 RUN cd /tmp/ && curl -fsSL https://developer.fermyon.com/downloads/install.sh | bash && mv spin /usr/local/bin/
 RUN cargo install subxt-cli && cargo install hurl
 
-#== Second stage: 
