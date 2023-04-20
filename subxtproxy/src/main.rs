@@ -40,6 +40,7 @@ pub struct Payload {
 //    randomvec: Vec<u8>,
 //}
 
+const SUBNODE_RPC_ENV: &str = "SUBNODE_RPC";
 const REDIS_ADDRESS_ENV: &str = "REDIS_URL";
 
 #[subxt::subxt(runtime_metadata_path = "metadata.scale")]
@@ -51,15 +52,17 @@ pub mod substrate {}
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
 
+    let rpc_addr = std::env::var(SUBNODE_RPC_ENV)?;
+    let rpc_addr2 = rpc_addr.clone();
     let redis_addr = std::env::var(REDIS_ADDRESS_ENV)?;
-    let redis_client = redis::Client::open(&redis_addr).unwrap();
+    let redis_client = redis::Client::open(redis_addr).unwrap();
     let mut redis_conn = redis_client.get_async_connection().await?;
     let mut redis_conn1 = redis_client.get_async_connection().await?;
     let mut pubsub_conn = redis_client.get_async_connection().await?.into_pubsub();
 
     let task_subxt = tokio::task::spawn(async move {
         //let api = OnlineClient::<SubstrateConfig>::new().await?;
-        let api = OnlineClient::<PolkadotConfig>::new().await?;
+        let api = OnlineClient::<PolkadotConfig>::from_url(rpc_addr).await?;
 
         let mut of_events = api.events().subscribe().await?.filter_events::<(
             substrate::eight_fish_module::events::Action,
@@ -143,7 +146,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Get a instance of subxt to send transactions to substrate
         let signer = PairSigner::new(AccountKeyring::Alice.pair());
-        let api = OnlineClient::<PolkadotConfig>::new().await.unwrap();
+        // let api = OnlineClient::<PolkadotConfig>::new().await.unwrap();
+        let api = OnlineClient::<PolkadotConfig>::from_url(rpc_addr2).await.unwrap();
 
         loop {
             let msg = pubsub_stream.next().await;

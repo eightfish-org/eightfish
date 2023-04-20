@@ -2,11 +2,10 @@
 FROM docker.io/paritytech/ci-linux:production as builder
 
 WORKDIR /eightfish
-COPY . .
+COPY .. .
 
 # install rust components
 RUN rustup target add wasm32-unknown-unknown --toolchain nightly
-RUN rustup target add wasm32-unknown-unknown
 RUN rustup target add wasm32-wasi
 
 # install third tools
