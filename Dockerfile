@@ -20,7 +20,7 @@ RUN cd examples/simple && spin build
 
 #== Second stage: 
 FROM docker.io/library/ubuntu:20.04
-LABEL description="EightFish: a platform for web3"
+LABEL description="EightFish: a platform for Open Web"
 
 WORKDIR /eightfish
 

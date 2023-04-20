@@ -1,9 +1,9 @@
 #== First stage: this is the build stage for Substrate. Here we create the binary.
-FROM eightfish-m2-docker as builder
+FROM eightfish-m2-build as builder
 
 #== Second stage: 
 FROM docker.io/library/ubuntu:20.04
-LABEL description="EightFish: a platform for web3"
+LABEL description="EightFish: a platform for Open Web"
 
 WORKDIR /eightfish
 

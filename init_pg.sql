@@ -1,7 +1,3 @@
--- CREATE DATABASE spin_dev;
-
-\c test3;
-
 CREATE TABLE article (
 	id varchar PRIMARY KEY,
 	title varchar(80) NOT NULL,

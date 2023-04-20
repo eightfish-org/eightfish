@@ -40,6 +40,8 @@ pub struct Payload {
 //    randomvec: Vec<u8>,
 //}
 
+const REDIS_ADDRESS_ENV: &str = "REDIS_URL";
+
 #[subxt::subxt(runtime_metadata_path = "metadata.scale")]
 pub mod substrate {}
 
@@ -49,7 +51,8 @@ pub mod substrate {}
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
 
-    let redis_client = redis::Client::open("redis://127.0.0.1/").unwrap();
+    let redis_addr = std::env::var(REDIS_ADDRESS_ENV)?;
+    let redis_client = redis::Client::open(&redis_addr).unwrap();
     let mut redis_conn = redis_client.get_async_connection().await?;
     let mut redis_conn1 = redis_client.get_async_connection().await?;
     let mut pubsub_conn = redis_client.get_async_connection().await?.into_pubsub();
