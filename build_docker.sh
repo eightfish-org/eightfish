@@ -1,1 +1,1 @@
-docker build -t eightfish-m2-docker .
+docker build -t eightfish-m2-small .
