@@ -1,0 +1,15 @@
+spin_version = "1"
+authors = ["Fermyon Engineering <engineering@fermyon.com>"]
+description = "A redis application."
+name = "simple"
+trigger = {type = "redis", address = "redis://cache_1:6379"}
+version = "0.1.0"
+
+[[component]]
+id = "redis-worker"
+source = "target/wasm32-wasi/release/simple.wasm"
+#environment = { DB_URL = "host=localhost user=postgres password=123456 dbname=spin_dev sslmode=disable", REDIS_URL = "redis://127.0.0.1:6379"}
+[component.trigger]
+channel="proxy2spin"
+[component.build]
+command = "cargo build --target wasm32-wasi --release"

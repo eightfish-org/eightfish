@@ -10,6 +10,6 @@ WORKDIR /eightfish
 RUN mkdir -p /eightfish/target/wasm32-wasi/release/
 
 COPY --from=builder /usr/local/bin/spin /usr/local/bin
-COPY --from=builder /eightfish/examples/simple/spin.toml /eightfish/simple_app_spin.toml
+COPY --from=builder /eightfish/examples/simple/spin-a.toml /eightfish/simple_app_spin.toml
 COPY --from=builder /eightfish/examples/simple/target/wasm32-wasi/release/simple.wasm /eightfish/target/wasm32-wasi/release/
 

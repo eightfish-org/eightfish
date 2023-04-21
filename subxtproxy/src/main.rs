@@ -53,8 +53,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
 
     let rpc_addr = std::env::var(SUBNODE_RPC_ENV)?;
+    println!("rpc_addr: {}", rpc_addr);
     let rpc_addr2 = rpc_addr.clone();
     let redis_addr = std::env::var(REDIS_ADDRESS_ENV)?;
+    println!("redis_addr: {}", redis_addr);
     let redis_client = redis::Client::open(redis_addr).unwrap();
     let mut redis_conn = redis_client.get_async_connection().await?;
     let mut redis_conn1 = redis_client.get_async_connection().await?;

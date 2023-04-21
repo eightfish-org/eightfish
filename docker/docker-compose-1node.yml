@@ -10,7 +10,7 @@ services:
     #volumes:
     #  - /tmp/subnode_devdata:/data
     command: eightfish-subnode --dev
-#    networks:
+# #    networks:
 #      intranet_1:
 #      testing_net:
 #        ipv4_address: 172.28.1.1
@@ -18,43 +18,45 @@ services:
   subxtproxy_1:
     image: eightfish-m2-subxtproxy
     restart: always
-    #environment:
-      #- REDIS_URL="redis://cache_1:6379"
-    command: sh -c "export REDIS_URL=redis://cache_1:6379; export SUBNODE_RPC=ws://subnode_1:9944/; subxtproxy"
+    environment:
+      - REDIS_URL=redis://cache_1:6379
+      - SUBNODE_RPC=ws://subnode_1:9944
+    #command: sh -c "export REDIS_URL=redis://cache_1:6379; export SUBNODE_RPC=ws://subnode_1:9944/; subxtproxy"
+    command: subxtproxy
     depends_on:
       - cache_1
       - subnode_1
+# #    networks:
+#      intranet_1:
+#      testing_net:
+#        ipv4_address: 172.28.1.1
+
+  # http_gate_1:
+  #   image: eightfish-m2-http_gate
+  #   restart: always
+  #   ports:
+  #     - "3000:3000"
+  #   command: sh -c "REDIS_URL=redis://cache_1:6379 spin up -f http_gate_spin.toml"
+  #   depends_on:
+  #     - cache_1
 #    networks:
 #      intranet_1:
 #      testing_net:
 #        ipv4_address: 172.28.1.1
 
-  http_gate_1:
-    image: eightfish-m2-http_gate
-    restart: always
-    ports:
-      - "3000:3000"
-    command: sh -c "REDIS_URL=redis://cache_1:6379 spin up -f http_gate_spin.toml"
-    depends_on:
-      - cache_1
-#    networks:
-#      intranet_1:
-#      testing_net:
-#        ipv4_address: 172.28.1.1
-
-  simple_app_1:
-    image: eightfish-m2-simple_app
-    restart: always
-    #environment:
-      #- REDIS_URL="redis://cache_1:6379"
-      #- DB_URL="host=db_1 user=postgres password=postgres dbname=spin_dev sslmode=disable" 
-    #volumes:
-    #  - /tmp/subnode_devdata:/data
-    command: sh -c "export REDIS_URL=redis://cache_1:6379; export DB_URL='host=db_1 user=postgres password=postgres dbname=spin_dev sslmode=disable'; spin up -f simple_app_spin.toml"
-    depends_on:
-      - cache_1
-      - db_1
-#    networks:
+#   simple_app_1:
+#     image: eightfish-m2-simple_app:v1
+#     restart: always
+#     #environment:
+#       #- REDIS_URL="redis://cache_1:6379"
+#       #- DB_URL="host=db_1 user=postgres password=postgres dbname=spin_dev sslmode=disable" 
+#     #volumes:
+#     #  - /tmp/subnode_devdata:/data
+#     command: sh -c "export REDIS_URL=redis://cache_1:6379; export DB_URL='host=db_1 user=postgres password=postgres dbname=spin_dev sslmode=disable'; echo $REDIS_URL; echo $DB_URL; echo '=====>>>'; spin up -f simple_app_spin.toml"
+#     depends_on:
+#       - cache_1
+#       - db_1
+# #    networks:
 #      intranet_1:
 #      testing_net:
 #        ipv4_address: 172.28.1.1
