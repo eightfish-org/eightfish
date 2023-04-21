@@ -47,7 +47,7 @@ services:
   simple_app_1:
     image: eightfish-m2-simple_app-a
     restart: always
-    command: spin up -f simple_app_spin.toml -e REDIS_URL=redis://cache_1:6379 -e DB_URL="host=db_1 user=postgres password=postgres dbname=spin_dev sslmode=disable" -e RUST_BACKTRACE=1
+    command: spin up -f simple_app_spin.toml -e REDIS_URL=redis://cache_1:6379 -e DB_URL="host=db_1 user=postgres password=postgres dbname=spin_dev sslmode=disable"
     depends_on:
       - cache_1
       - db_1

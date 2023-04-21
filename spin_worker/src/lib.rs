@@ -57,6 +57,7 @@ impl Worker {
         match &msg_obj.action[..] {
             "query" => {
                 let redis_addr = std::env::var(REDIS_URL_ENV)?;
+                let pg_addr = std::env::var(DB_URL_ENV)?;
                 let method = Method::Get;
                 // path info put in the model field from the http_gate
                 let path = msg_obj.model.to_owned();
@@ -75,7 +76,8 @@ impl Worker {
                 println!("Worker::work: in query branch: ef_res: {:?}", ef_res);
 
                 // we check the intermediate result  in the framework internal
-                let pair_list = inner_stuffs_on_query_result(&reqid, &ef_res).unwrap();
+                let pair_list =
+                    inner_stuffs_on_query_result(&redis_addr, &pg_addr, &reqid, &ef_res).unwrap();
                 println!("Worker::work: in query branch: pair_list: {:?}", pair_list);
 
                 if pair_list.is_some() {
@@ -257,12 +259,11 @@ fn tail_post_process(
 }
 
 fn inner_stuffs_on_query_result(
+    redis_addr: &str,
+    pg_addr: &str,
     reqid: &str,
     res: &EightFishResponse,
 ) -> Result<Option<Vec<(String, String)>>> {
-    let pg_addr = std::env::var(DB_URL_ENV)?;
-    let redis_addr = std::env::var(REDIS_URL_ENV)?;
-
     if res.pair_list().is_some() {
         let table_name = &res.info().model_name;
         let pair_list = res.pair_list().clone().unwrap();
