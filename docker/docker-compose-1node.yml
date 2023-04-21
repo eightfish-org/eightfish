@@ -20,7 +20,7 @@ services:
     restart: always
     #environment:
       #- REDIS_URL="redis://cache_1:6379"
-    command: sh -c "REDIS_URL=redis://cache_1:6379 SUBNODE_RPC=ws://subnode_1:9944/ subxtproxy"
+    command: sh -c "export REDIS_URL=redis://cache_1:6379; export SUBNODE_RPC=ws://subnode_1:9944/; subxtproxy"
     depends_on:
       - cache_1
       - subnode_1
@@ -50,7 +50,7 @@ services:
       #- DB_URL="host=db_1 user=postgres password=postgres dbname=spin_dev sslmode=disable" 
     #volumes:
     #  - /tmp/subnode_devdata:/data
-    command: sh -c "REDIS_URL=redis://cache_1:6379 DB_URL="host=db_1 user=postgres password=postgres dbname=spin_dev sslmode=disable" spin up -f simple_app_spin.toml"
+    command: sh -c "export REDIS_URL=redis://cache_1:6379; export DB_URL='host=db_1 user=postgres password=postgres dbname=spin_dev sslmode=disable'; spin up -f simple_app_spin.toml"
     depends_on:
       - cache_1
       - db_1
@@ -75,7 +75,7 @@ services:
     volumes: 
       # - ./postgres-data:/var/lib/postgresql/data
       # copy the sql script to create tables
-      - init_pg.sql:/docker-entrypoint-initdb.d/init_pg.sql
+      - ./init_pg.sql:/docker-entrypoint-initdb.d/init_pg.sql
 #    networks:
 #      intranet_1:
 
