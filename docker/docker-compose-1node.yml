@@ -9,7 +9,8 @@ services:
       - "30333:30333"
     #volumes:
     #  - /tmp/subnode_devdata:/data
-    command: eightfish-subnode --chain=local --alice -d /tmp --unsafe-rpc-external --unsafe-ws-external --rpc-cors all --validator --node-key 0000000000000000000000000000000000000000000000000000000000000001
+#    command: eightfish-subnode --chain=local --alice -d /tmp --unsafe-rpc-external --unsafe-ws-external --rpc-cors all --validator --node-key 0000000000000000000000000000000000000000000000000000000000000001
+    command: eightfish-subnode --chain=dev --alice -d /tmp --unsafe-rpc-external --unsafe-ws-external --rpc-cors all --validator --node-key 0000000000000000000000000000000000000000000000000000000000000001
 # #    networks:
 #      intranet_1:
 #      testing_net:
@@ -35,9 +36,7 @@ services:
     restart: always
     ports:
       - "3000:3000"
-    environment:
-      - REDIS_URL=redis://cache_1:6379
-    command: spin up -f http_gate_spin.toml
+    command: spin up -f http_gate_spin.toml --listen 0.0.0.0:3000 -e REDIS_URL=redis://cache_1:6379
     depends_on:
       - cache_1
 #    networks:
@@ -48,10 +47,7 @@ services:
   simple_app_1:
     image: eightfish-m2-simple_app-a
     restart: always
-    environment:
-      - REDIS_URL="redis://cache_1:6379"
-      - DB_URL="host=db_1 user=postgres password=postgres dbname=spin_dev sslmode=disable" 
-    command: spin up -f simple_app_spin.toml
+    command: spin up -f simple_app_spin.toml -e REDIS_URL=redis://cache_1:6379 -e DB_URL="host=db_1 user=postgres password=postgres dbname=spin_dev sslmode=disable" -e RUST_BACKTRACE=1
     depends_on:
       - cache_1
       - db_1
