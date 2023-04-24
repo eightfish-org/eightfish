@@ -7,14 +7,7 @@ services:
       - "9933:9933"
       - "9944:9944"
       - "30333:30333"
-    #volumes:
-    #  - /tmp/subnode_devdata:/data
-#    command: eightfish-subnode --chain=local --alice -d /tmp --unsafe-rpc-external --unsafe-ws-external --rpc-cors all --validator --node-key 0000000000000000000000000000000000000000000000000000000000000001
     command: eightfish-subnode --chain=dev --alice -d /tmp --unsafe-rpc-external --unsafe-ws-external --rpc-cors all --validator --node-key 0000000000000000000000000000000000000000000000000000000000000001
-# #    networks:
-#      intranet_1:
-#      testing_net:
-#        ipv4_address: 172.28.1.1
     
   subxtproxy_1:
     image: eightfish-m2-subxtproxy
@@ -26,10 +19,6 @@ services:
     depends_on:
       - cache_1
       - subnode_1
-# #    networks:
-#      intranet_1:
-#      testing_net:
-#        ipv4_address: 172.28.1.1
 
   http_gate_1:
     image: eightfish-m2-http_gate
@@ -39,10 +28,6 @@ services:
     command: spin up -f http_gate_spin.toml --listen 0.0.0.0:3000 -e REDIS_URL=redis://cache_1:6379
     depends_on:
       - cache_1
-#    networks:
-#      intranet_1:
-#      testing_net:
-#        ipv4_address: 172.28.1.1
 
   simple_app_1:
     image: eightfish-m2-simple_app-a
@@ -53,10 +38,6 @@ services:
       - db_1
       - subnode_1
       - subxtproxy_1
-# #    networks:
-#      intranet_1:
-#      testing_net:
-#        ipv4_address: 172.28.1.1
 
   db_1:
     image: postgres:15.2-alpine
@@ -75,8 +56,6 @@ services:
       # - ./postgres-data:/var/lib/postgresql/data
       # copy the sql script to create tables
       - ./init_pg.sql:/docker-entrypoint-initdb.d/init_pg.sql
-#    networks:
-#      intranet_1:
 
   cache_1:
     image: redis:6.2-alpine
@@ -86,8 +65,6 @@ services:
     command: redis-server --save 20 1 --loglevel warning 
     #volumes: 
       # - cache:/data
-#    networks:
-#      intranet_1:
 
 networks:
   testing_net:

@@ -91,6 +91,8 @@ services:
       - "9934:9933"
       - "9945:9944"
       - "30334:30333"
+    depends_on:
+      - subnode_1
     #volumes:
     #  - /tmp/subnode_devdata:/data
     command: eightfish-subnode --chain=local --bob -d /tmp/bob --unsafe-rpc-external --unsafe-ws-external --rpc-cors all --validator --node-key 0000000000000000000000000000000000000000000000000000000000000002 --bootnodes '/ip4/172.28.1.1/tcp/30333/p2p/12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp'
@@ -148,6 +150,8 @@ services:
         max-file: "3"
     ports:
       - '5433:5432'
+    depends_on:
+      - db_1
     volumes: 
       # - ./postgres-data:/var/lib/postgresql/data
       # copy the sql script to create tables
@@ -160,6 +164,8 @@ services:
     restart: always
     ports:
       - '6380:6379'
+    depends_on:
+      - cache_1
     command: redis-server --save 20 1 --loglevel warning 
     #volumes: 
       # - cache:/data
