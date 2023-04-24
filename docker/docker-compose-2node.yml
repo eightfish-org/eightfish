@@ -1,6 +1,6 @@
 version: '3.7'
 services:
-  ##== group 1
+  ##======= group 1 =======
   subnode_1:
     image: eightfish-m2-subnode
     restart: always
@@ -83,7 +83,7 @@ services:
     networks:
       - intranet_1
 
-  ##== group 2
+  ##======= group 2 =======
   subnode_2:
     image: eightfish-m2-subnode
     restart: always
@@ -93,7 +93,7 @@ services:
       - "30334:30333"
     #volumes:
     #  - /tmp/subnode_devdata:/data
-    command: eightfish-subnode --chain=local --bob -d /tmp/bob --unsafe-rpc-external --unsafe-ws-external --rpc-cors all --validator --node-key 0000000000000000000000000000000000000000000000000000000000000001
+    command: eightfish-subnode --chain=local --bob -d /tmp/bob --unsafe-rpc-external --unsafe-ws-external --rpc-cors all --validator --node-key 0000000000000000000000000000000000000000000000000000000000000002 --bootnodes '/ip4/172.28.1.1/tcp/30333/p2p/12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp'
     networks:
       testing_net:
         ipv4_address: 172.28.1.2
