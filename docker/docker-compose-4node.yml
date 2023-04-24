@@ -8,6 +8,8 @@ services:
       - "9933:9933"
       - "9944:9944"
       - "30333:30333"
+    depends_on:
+      - db_1
     #volumes:
     #  - /tmp/subnode_devdata:/data
     command: eightfish-subnode --chain=local --alice -d /tmp/alice --unsafe-rpc-external --unsafe-ws-external --rpc-cors all --validator --node-key 0000000000000000000000000000000000000000000000000000000000000001
@@ -37,6 +39,7 @@ services:
     command: spin up -f http_gate_spin.toml --listen 0.0.0.0:3000 -e REDIS_URL=redis://cache_1:6379
     depends_on:
       - cache_1
+      - subxtproxy_1
     networks:
       - intranet_1
 
@@ -65,6 +68,8 @@ services:
         max-file: "3"
     ports:
       - '5432:5432'
+    depends_on:
+      - cache_1
     volumes: 
       # - ./postgres-data:/var/lib/postgresql/data
       # copy the sql script to create tables
@@ -93,6 +98,7 @@ services:
       - "30334:30333"
     depends_on:
       - subnode_1
+      - db_2
     #volumes:
     #  - /tmp/subnode_devdata:/data
     command: eightfish-subnode --chain=local --bob -d /tmp/bob --unsafe-rpc-external --unsafe-ws-external --rpc-cors all --validator --node-key 0000000000000000000000000000000000000000000000000000000000000002 --bootnodes '/ip4/172.28.1.1/tcp/30333/p2p/12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp'
@@ -122,6 +128,7 @@ services:
     command: spin up -f http_gate_spin.toml --listen 0.0.0.0:3000 -e REDIS_URL=redis://cache_2:6379
     depends_on:
       - cache_2
+      - subxtproxy_2
     networks:
       - intranet_2
 
@@ -152,6 +159,7 @@ services:
       - '5433:5432'
     depends_on:
       - db_1
+      - cache_2
     volumes: 
       # - ./postgres-data:/var/lib/postgresql/data
       # copy the sql script to create tables
@@ -182,6 +190,7 @@ services:
       - "30335:30333"
     depends_on:
       - subnode_2
+      - db_3
     #volumes:
     #  - /tmp/subnode_devdata:/data
     command: eightfish-subnode --chain=local --charlie -d /tmp/charlie --unsafe-rpc-external --unsafe-ws-external --rpc-cors all --validator --node-key 0000000000000000000000000000000000000000000000000000000000000003 --bootnodes '/ip4/172.28.1.1/tcp/30333/p2p/12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp'
@@ -211,6 +220,7 @@ services:
     command: spin up -f http_gate_spin.toml --listen 0.0.0.0:3000 -e REDIS_URL=redis://cache_3:6379
     depends_on:
       - cache_3
+      - subxtproxy_3
     networks:
       - intranet_3
 
@@ -241,6 +251,7 @@ services:
       - '5434:5432'
     depends_on:
       - db_2
+      - cache_3
     volumes: 
       # - ./postgres-data:/var/lib/postgresql/data
       # copy the sql script to create tables
@@ -272,6 +283,7 @@ services:
       - "30336:30333"
     depends_on:
       - subnode_3
+      - db_4
     #volumes:
     #  - /tmp/subnode_devdata:/data
     command: eightfish-subnode --chain=local --dave -d /tmp/dave --unsafe-rpc-external --unsafe-ws-external --rpc-cors all --validator --node-key 0000000000000000000000000000000000000000000000000000000000000004 --bootnodes '/ip4/172.28.1.1/tcp/30333/p2p/12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp'
@@ -301,6 +313,7 @@ services:
     command: spin up -f http_gate_spin.toml --listen 0.0.0.0:3000 -e REDIS_URL=redis://cache_4:6379
     depends_on:
       - cache_4
+      - subxtproxy_4
     networks:
       - intranet_4
 
@@ -331,6 +344,7 @@ services:
       - '5435:5432'
     depends_on:
       - db_3
+      - cache_4
     volumes: 
       # - ./postgres-data:/var/lib/postgresql/data
       # copy the sql script to create tables
