@@ -1,0 +1,185 @@
+version: '3.7'
+services:
+  ##======= group 1 =======
+  subnode_1:
+    image: eightfish-m2-subnode
+    restart: always
+    ports:
+      - "9933:9933"
+      - "9944:9944"
+      - "30333:30333"
+    #volumes:
+    #  - /tmp/subnode_devdata:/data
+    command: eightfish-subnode --chain=local --alice -d /tmp/alice --unsafe-rpc-external --unsafe-ws-external --rpc-cors all --validator --node-key 0000000000000000000000000000000000000000000000000000000000000001
+    networks:
+      testing_net:
+        ipv4_address: 172.28.1.1
+      intranet_1:
+    
+  subxtproxy_1:
+    image: eightfish-m2-subxtproxy
+    restart: always
+    environment:
+      - REDIS_URL=redis://cache_1:6379
+      - SUBNODE_RPC=ws://subnode_1:9944
+    command: subxtproxy
+    depends_on:
+      - cache_1
+      - subnode_1
+    networks:
+      - intranet_1
+
+  http_gate_1:
+    image: eightfish-m2-http_gate
+    restart: always
+    ports:
+      - "3000:3000"
+    command: spin up -f http_gate_spin.toml --listen 0.0.0.0:3000 -e REDIS_URL=redis://cache_1:6379
+    depends_on:
+      - cache_1
+    networks:
+      - intranet_1
+
+  simple_app_1:
+    image: eightfish-m2-simple_app-a
+    restart: always
+    command: spin up -f simple_app_spin.toml -e REDIS_URL=redis://cache_1:6379 -e DB_URL="host=db_1 user=postgres password=postgres dbname=spin_dev sslmode=disable"
+    depends_on:
+      - cache_1
+      - db_1
+      - subnode_1
+      - subxtproxy_1
+    networks:
+      - intranet_1
+
+  db_1:
+    image: postgres:15.2-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=spin_dev
+    logging:
+      options:
+        max-size: 10m
+        max-file: "3"
+    ports:
+      - '5432:5432'
+    volumes: 
+      # - ./postgres-data:/var/lib/postgresql/data
+      # copy the sql script to create tables
+      - ./init_pg.sql:/docker-entrypoint-initdb.d/init_pg.sql
+    networks:
+      - intranet_1
+
+  cache_1:
+    image: redis:6.2-alpine
+    restart: always
+    ports:
+      - '6379:6379'
+    command: redis-server --save 20 1 --loglevel warning 
+    #volumes: 
+      # - cache:/data
+    networks:
+      - intranet_1
+
+  ##======= group 2 =======
+  subnode_2:
+    image: eightfish-m2-subnode
+    restart: always
+    ports:
+      - "9934:9933"
+      - "9945:9944"
+      - "30334:30333"
+    depends_on:
+      - subnode_1
+    #volumes:
+    #  - /tmp/subnode_devdata:/data
+    command: eightfish-subnode --chain=local --bob -d /tmp/bob --unsafe-rpc-external --unsafe-ws-external --rpc-cors all --validator --node-key 0000000000000000000000000000000000000000000000000000000000000002 --bootnodes '/ip4/172.28.1.1/tcp/30333/p2p/12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp'
+    networks:
+      testing_net:
+        ipv4_address: 172.28.1.2
+      intranet_2:
+    
+  subxtproxy_2:
+    image: eightfish-m2-subxtproxy
+    restart: always
+    environment:
+      - REDIS_URL=redis://cache_2:6379
+      - SUBNODE_RPC=ws://subnode_2:9944
+    command: subxtproxy
+    depends_on:
+      - cache_2
+      - subnode_2
+    networks:
+      - intranet_2
+
+  http_gate_2:
+    image: eightfish-m2-http_gate
+    restart: always
+    ports:
+      - "3001:3000"
+    command: spin up -f http_gate_spin.toml --listen 0.0.0.0:3000 -e REDIS_URL=redis://cache_2:6379
+    depends_on:
+      - cache_2
+    networks:
+      - intranet_2
+
+  simple_app_2:
+    image: eightfish-m2-simple_app-b
+    restart: always
+    command: spin up -f simple_app_spin.toml -e REDIS_URL=redis://cache_2:6379 -e DB_URL="host=db_2 user=postgres password=postgres dbname=spin_dev sslmode=disable"
+    depends_on:
+      - cache_2
+      - db_2
+      - subnode_2
+      - subxtproxy_2
+    networks:
+      - intranet_2
+
+  db_2:
+    image: postgres:15.2-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=spin_dev
+    logging:
+      options:
+        max-size: 10m
+        max-file: "3"
+    ports:
+      - '5433:5432'
+    depends_on:
+      - db_1
+    volumes: 
+      # - ./postgres-data:/var/lib/postgresql/data
+      # copy the sql script to create tables
+      - ./init_pg.sql:/docker-entrypoint-initdb.d/init_pg.sql
+    networks:
+      - intranet_2
+
+  cache_2:
+    image: redis:6.2-alpine
+    restart: always
+    ports:
+      - '6380:6379'
+    depends_on:
+      - cache_1
+    command: redis-server --save 20 1 --loglevel warning 
+    #volumes: 
+      # - cache:/data
+    networks:
+      - intranet_2
+
+
+networks:
+  testing_net:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/16
+  intranet_1:
+  intranet_2:
+  intranet_3:
+  intranet_4:

@@ -18,6 +18,7 @@ fn http_gate(req: Request) -> Result<Response> {
     println!("req: {:?}", req);
 
     let redis_addr = std::env::var(REDIS_ADDRESS_ENV)?;
+    println!("redis_addr is: {}", redis_addr);
 
     let uri = req.uri();
     let path = uri.path().to_owned();
