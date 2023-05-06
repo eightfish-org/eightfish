@@ -10,29 +10,18 @@ Unlike the smart contract blockchain tech stack most DApps adopt, EightFish make
 
 By some elaberate designs, EightFish reaches the experiences of Web2/Internet web development, but for OpenWeb/Web3 decentralized application.
 
-Currently this project is under heavily coded, the status is before alpha-releasing.
-
 Note: EightFish itself is not a service/platform/serverless, it is just a dev framework tool.
 
-## Docker
+## Status
 
-Build the docker devlelopment environment.
+W3F grant milestone II.
 
-```
-./build_docker.sh
-```
+Currently this project is under heavily coding, the status is before alpha-releasing.
 
-Enter the docker container.
+## Docker and Tests
 
-```
-./run_docker.sh
-```
+Please follow steps in the [docker doc](https://github.com/eightfish-org/eightfish/blob/master/docs/docker.md) to build and test.
 
-now you're in the docker dev environment.
-
-## Test
-
-Please refer to [Flow Tests](./flow_tests.md) and [Unit Tests](./unit_tests.md).
 
 ## License
 
