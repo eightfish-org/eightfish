@@ -17,4 +17,4 @@ json-digest = "0.0.16"
 
 [dev-dependencies]
 eightfish = {path = "../"}
-spin-sdk = { git = "https://github.com/fermyon/spin" }
+spin-sdk = { git = "https://github.com/fermyon/spin", tag = "v1.1.0" }

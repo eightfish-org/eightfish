@@ -19,6 +19,7 @@ serde_json = { version = '1.0', default-features = false, features = ['alloc'] }
 members = [
   "subnode",
   "subxtproxy",
+  "spin_worker",
   "eightfish-derive",
   "http_gate",
   "example/simple",
