@@ -20,9 +20,20 @@ cd docker/
 ./build_services.sh
 ```
 
-This script will build other 7 images.
+This script will build other 3 images.
 
-### Third step: run docker-compose 
+### Third Step: build app images
+
+Go to docker/ subdir, execute:
+
+```
+cd docker/
+./build_apps.sh
+```
+
+This script will build other 4 images.
+
+### Fourth step: run docker-compose 
 
 We provide three docker-compose config files, you can choose one to test:
 
@@ -47,7 +58,7 @@ For 2-nodes testing, the exported port is: 3000, 3001.
 
 For 4-nodes testing, the exported port is: 3000, 3001, 3002, 3003.
 
-### Fourth step: tests
+### Fifth step: tests
 
 The testing flow is as same as Milestone I.
 
