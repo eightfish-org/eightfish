@@ -270,7 +270,7 @@ fn inner_stuffs_on_query_result(
         // get the id list from obj list
         let ids: Vec<String> = pair_list
             .iter()
-            .map(|(id, _)| String::new() + "'" + id + "'")
+            .map(|(id, _)| String::new() + "'" + &id[..] + "'")
             .collect();
         let ids_string = ids.join(",");
 
