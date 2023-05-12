@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use anyhow::bail;
 
-use crate::app::{Error, Result};
+use crate::app::Result;
 use crate::handler::EightFishHandler;
 use crate::request::{EightFishRequest, Method};
 use crate::response::EightFishResponse;
@@ -119,7 +120,7 @@ impl Router {
         } else {
             // panic!("router not matched!");
             // self.redirect_slash(req).and_then(|redirect| Some(Err(redirect)))
-            Err(Error::NotFound)
+            bail!("404");
         }
     }
 }

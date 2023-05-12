@@ -1,4 +1,4 @@
-use std::clone::Clone;
+// use std::clone::Clone;
 use std::sync::Arc;
 
 pub use crate::handler::EightFishHandler;
@@ -8,25 +8,28 @@ pub use crate::router::EightFishRouter;
 pub use crate::router_m::Router;
 
 /// EightFish Error
-#[derive(Debug, PartialEq, Clone)]
-pub enum Error {
+// #[derive(Debug, PartialEq, Clone)]
+// pub enum Error {
     //InvalidConfig,
     //InvalidRouterConfig,
     //FileNotExist,
-    NotFound,
+    // NotFound,
     //Unauthorized,                // 401
     //Forbidden,                   // 403
     //Break(String),               // 400
-    InternalServerError(String), // 500
+    // InternalServerError(String), // 500
                                  //Found(String),               // 301
                                  //TemporaryRedirect(String),   // 307
                                  //Custom(String),
                                  //CustomHtml(String),
                                  //CustomJson(String),
-}
+// }
 
+
+pub type Error = anyhow::Error;
 /// EightFish result struct
-pub type Result<T> = ::std::result::Result<T, Error>;
+// pub type Result<T> = ::std::result::Result<T, Error>;
+pub type Result<T> = anyhow::Result<T>;
 
 /// GlobalFilter trait, used to place global `before` and `after` middlewares
 pub trait GlobalFilter {
