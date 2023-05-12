@@ -120,7 +120,7 @@ impl Router {
         } else {
             // panic!("router not matched!");
             // self.redirect_slash(req).and_then(|redirect| Some(Err(redirect)))
-            bail!("404");
+            bail!("404".to_string());
         }
     }
 }

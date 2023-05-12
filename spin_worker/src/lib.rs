@@ -69,23 +69,66 @@ impl Worker {
                 println!("Worker::work: in query branch: ef_req");
 
                 let ef_res = self.app.handle(&mut ef_req);
-                if ef_res.is_err() {
-                    return Err(anyhow!("fooo get"));
-                }
-                let ef_res = ef_res.unwrap();
-                println!("Worker::work: in query branch: ef_res: {:?}", ef_res);
+                match ef_res {
+                    Ok(ef_res) => {
+                        println!("Worker::work: in query branch: ef_res: {:?}", ef_res);
+                        // we check the intermediate result  in the framework internal
+                        let pair_list =
+                            inner_stuffs_on_query_result(&redis_addr, &pg_addr, &reqid, &ef_res).unwrap();
+                        println!("Worker::work: in query branch: pair_list: {:?}", pair_list);
 
-                // we check the intermediate result  in the framework internal
-                let pair_list =
-                    inner_stuffs_on_query_result(&redis_addr, &pg_addr, &reqid, &ef_res).unwrap();
-                println!("Worker::work: in query branch: pair_list: {:?}", pair_list);
-
-                if pair_list.is_some() {
-                    let modelname = ef_res.info().model_name.to_owned();
-                    // we can retrieve the model name from the path
-                    // but that will force the developer use a strict unified url shcema in his product
-                    // the names in query and post must MATCH
-                    tail_query_process(&redis_addr, &reqid, &modelname, &pair_list.unwrap());
+                        if pair_list.is_some() {
+                            let modelname = ef_res.info().model_name.to_owned();
+                            // we can retrieve the model name from the path
+                            // but that will force the developer use a strict unified url shcema in his product
+                            // the names in query and post must MATCH
+                            tail_query_process(&redis_addr, &reqid, &modelname, &pair_list.unwrap());
+                        }
+                    }
+                    Err(err) => {
+                        match err.downcast_ref::<&str>() {
+                            Some(&"404") => {
+                                // write not found msg to cache
+                                _ = redis::set(
+                                    &redis_addr,
+                                    &CACHE_STATUS_RESULTS.replace('#', &reqid),
+                                    b"404",
+                                );
+                                _ = redis::set(
+                                    &redis_addr,
+                                    &CACHE_RESULTS.replace('#', &reqid),
+                                    b"Not Found",
+                                );
+                            },
+                            Some(s) => {
+                                // write not found msg to cache
+                                _ = redis::set(
+                                    &redis_addr,
+                                    &CACHE_STATUS_RESULTS.replace('#', &reqid),
+                                    b"500",
+                                );
+                                _ = redis::set(
+                                    &redis_addr,
+                                    &CACHE_RESULTS.replace('#', &reqid),
+                                    &s.as_bytes(),
+                                );
+                            },
+                            None => {
+                                // write not found msg to cache
+                                _ = redis::set(
+                                    &redis_addr,
+                                    &CACHE_STATUS_RESULTS.replace('#', &reqid),
+                                    b"500",
+                                );
+                                _ = redis::set(
+                                    &redis_addr,
+                                    &CACHE_RESULTS.replace('#', &reqid),
+                                    &format!("{}", err).as_bytes(),
+                                );
+                            },
+                        }
+                        return Err(anyhow!("query error"));
+                    }
                 }
             }
             "post" => {
@@ -117,18 +160,61 @@ impl Worker {
                     .insert("random_str".to_string(), random_string);
 
                 let ef_res = self.app.handle(&mut ef_req);
-                if ef_res.is_err() {
-                    return Err(anyhow!("fooo post"));
+                match ef_res {
+                    Ok(ef_res) => {
+                        println!("Worker::work: in post branch: ef_res: {:?}", ef_res);
+                        let pair_list = inner_stuffs_on_post_result(&ef_res).unwrap();
+                        println!("Worker::work: in post branch: pair_list: {:?}", pair_list);
+
+                        let modelname = ef_res.info().model_name.to_owned();
+
+                        tail_post_process(&redis_addr, &reqid, &modelname, &pair_list);
+                    },
+                    Err(err) => {
+                        match err.downcast_ref::<&str>() {
+                            Some(&"404") => {
+                                // write not found msg to cache
+                                _ = redis::set(
+                                    &redis_addr,
+                                    &CACHE_STATUS_RESULTS.replace('#', &reqid),
+                                    b"404",
+                                );
+                                _ = redis::set(
+                                    &redis_addr,
+                                    &CACHE_RESULTS.replace('#', &reqid),
+                                    b"Not Found",
+                                );
+                            },
+                            Some(s) => {
+                                // write not found msg to cache
+                                _ = redis::set(
+                                    &redis_addr,
+                                    &CACHE_STATUS_RESULTS.replace('#', &reqid),
+                                    b"500",
+                                );
+                                _ = redis::set(
+                                    &redis_addr,
+                                    &CACHE_RESULTS.replace('#', &reqid),
+                                    &s.as_bytes(),
+                                );
+                            },
+                            None => {
+                                // write not found msg to cache
+                                _ = redis::set(
+                                    &redis_addr,
+                                    &CACHE_STATUS_RESULTS.replace('#', &reqid),
+                                    b"500",
+                                );
+                                _ = redis::set(
+                                    &redis_addr,
+                                    &CACHE_RESULTS.replace('#', &reqid),
+                                    &format!("{}", err).as_bytes(),
+                                );
+                            },
+                        }
+                        return Err(anyhow!("post error"));
+                    }
                 }
-                println!("Worker::work: in post branch: ef_res: {:?}", ef_res);
-                let ef_res = ef_res.unwrap();
-
-                let pair_list = inner_stuffs_on_post_result(&ef_res).unwrap();
-                println!("Worker::work: in post branch: pair_list: {:?}", pair_list);
-
-                let modelname = ef_res.info().model_name.to_owned();
-
-                tail_post_process(&redis_addr, &reqid, &modelname, &pair_list);
             }
             "update_index" => {
                 // Callback: handle the result of the update_index call event
