@@ -106,12 +106,14 @@ fn http_gate(req: Request) -> Result<Response> {
     let mut loop_count = 1;
     loop {
         // loop the redis cache key of this procedure request
-        let result = redis::get(&redis_addr, &format!("cache:{reqid}"))
-            .map_err(|_| anyhow!("Error querying Redis"))?;
+        // let result = redis::get(&redis_addr, &format!("cache:{reqid}"))
         // TODO: check the cache:status::{reqid} for the processing status flag
+        let status_code = redis::get(&redis_addr, &format!("cache:status:{reqid}"))
+            .map_err(|_| anyhow!("Error querying Redis"))?;
         //println!("check result: {:?}", result);
-        if result.is_empty() {
-            // after 6 seconds, timeout
+
+        if status_code.is_empty() {
+            // after 20 seconds, timeout
             if loop_count < 2000 {
                 // if not get the result, sleep for a little period
                 let ten_millis = std::time::Duration::from_millis(10);
@@ -120,27 +122,31 @@ fn http_gate(req: Request) -> Result<Response> {
 
                 //println!("loop continue {}...", loop_count);
             } else {
-                println!("timeout, return 500");
+                println!("timeout, return 408");
                 // timeout handler, use which http status code?
                 return Ok(http::Response::builder()
-                    .status(500)
+                    .status(408)
                     .header("Access-Control-Allow-Origin", "*")
-                    .body(Some("No data".into()))?);
+                    .body(Some("Request Timeout".into()))?);
             }
         } else {
             // Now we get the raw serialized result from worker, we suppose it use
             // JSON spec to serialized it, so we can directly pass it back
             // to user's response body.
+            let res_body = redis::get(&redis_addr, &format!("cache:{reqid}"))
+                .map_err(|_| anyhow!("Error querying Redis"))?;
             // clear the redis cache key of the worker result
-            // TODO: add del command to host function, pr to spin
+            let _ = redis::del(&redis_addr, &[&format!("cache:status:{reqid}")]);
             let _ = redis::del(&redis_addr, &[&format!("cache:{reqid}")]);
 
+            let status_code = String::from_utf8(status_code).unwrap();
+            let status_code = status_code.parse::<u16>().unwrap();
             // jump out this loop, and return the response to user
             return Ok(http::Response::builder()
-                .status(200)
+                .status(status_code)
                 .header("eightfish_version", "0.1")
                 .header("Access-Control-Allow-Origin", "*")
-                .body(Some(Bytes::from(result)))?);
+                .body(Some(Bytes::from(res_body)))?);
         }
     }
 }

@@ -239,7 +239,7 @@ impl Worker {
                 // cache
                 let redis_addr = std::env::var(REDIS_URL_ENV)?;
                 let cache_key = CACHE_STATUS_RESULTS.replace('#', &reqid);
-                _ = redis::set(&redis_addr, &cache_key, b"true");
+                _ = redis::set(&redis_addr, &cache_key, b"200");
                 let cache_key = CACHE_RESULTS.replace('#', &reqid);
                 _ = redis::set(&redis_addr, &cache_key, result.to_string().as_bytes());
             }
@@ -257,7 +257,7 @@ impl Worker {
                     _ = redis::set(
                         &redis_addr,
                         &CACHE_STATUS_RESULTS.replace('#', &reqid),
-                        b"true",
+                        b"200",
                     );
                     if let Ok(tmpdata) = tmpdata {
                         let _ =
@@ -397,7 +397,7 @@ fn inner_stuffs_on_query_result(
         _ = redis::set(
             &redis_addr,
             &CACHE_STATUS_RESULTS.replace('#', &reqid),
-            b"true",
+            b"200",
         );
         _ = redis::set(
             &redis_addr,
