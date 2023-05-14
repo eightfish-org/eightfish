@@ -117,6 +117,12 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
             pub fn build_get_one_sql() -> String {
                 format!("SELECT {} FROM {} WHERE id = $1", #field_names, #ident_string.to_string().to_lowercase())
             }
+
+            /// build the sql to get a record with id
+            pub fn build_get_one_by_sql(column: String) -> String {
+                format!("SELECT {} FROM {} WHERE {} = $1", #field_names, #ident_string.to_string().to_lowercase(), column)
+            }
+
             /// build the sql to get a list of records, with optional limit and offset
             pub fn build_get_list_sql(limit: Option<u64>, offset: Option<u64>) -> String {
                 let query = format!("SELECT {} FROM {}", #field_names, #ident_string.to_string().to_lowercase());
@@ -126,6 +132,17 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
                     _ => query
                 }
             }
+
+            /// build the sql to get a list of records, with optional limit and offset
+            pub fn build_get_list_by_sql(column: String, limit: Option<u64>, offset: Option<u64>) -> String {
+                let query = format!("SELECT {} FROM {} WHERE {} = $1", #field_names, #ident_string.to_string().to_lowercase(), column);
+                match (limit, offset) {
+                    (Some(l), Some(o)) => format!("{} LIMIT {} OFFSET {}", query, l, o),
+                    (Some(l), None) => format!("{} LIMIT {}", query, l),
+                    _ => query
+                }
+            }
+
             /// build the sql insert the record
             pub fn build_insert_sql() -> String {
                 format!("INSERT INTO {}({}) VALUES ({})", #ident_string.to_string().to_lowercase(), #field_names, #field_placeholders.to_string().replace("\"", ""))
@@ -139,9 +156,15 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
                 format!("DELETE FROM {} WHERE id = $1", #ident_string.to_string().to_lowercase())
             }
             /// build the parameters for the sql statement to get a record with id
-            pub fn build_get_one_params(id: &str) -> Vec<ParameterValue> {
+            pub fn build_get_list_by_params(value: &str) -> Vec<ParameterValue> {
                 let mut param_vec: Vec<ParameterValue> = Vec::new();
-                param_vec.push(ParameterValue::Str(id));
+                param_vec.push(ParameterValue::Str(value));
+                param_vec
+            }
+            /// build the parameters for the sql statement to get a record with id
+            pub fn build_get_one_params(value: &str) -> Vec<ParameterValue> {
+                let mut param_vec: Vec<ParameterValue> = Vec::new();
+                param_vec.push(ParameterValue::Str(value));
                 param_vec
             }
             /// build the parameters for the sql statement to delete the record
@@ -166,9 +189,21 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
                 )*
                 param_vec
             }
+            /// build both the sql statement and parameters to get a list record with column
+            pub fn build_get_list_by_sql_and_params(column: String, value: &str, limit: Option<u64>, offset: Option<u64>) -> (String, Vec<ParameterValue>) {
+                let sql = Self::build_get_list_by_sql(column, limit, offset);
+                let params = Self::build_get_one_params(value);
+                (sql, params)
+            }
             /// build both the sql statement and parameters to get a record with id
-            pub fn build_get_one_sql_and_params(id: &str) -> (String, Vec<ParameterValue>) {
-                (Self::build_get_one_sql(), Self::build_get_one_params(id))
+            pub fn build_get_one_sql_and_params(value: &str) -> (String, Vec<ParameterValue>) {
+                (Self::build_get_one_sql(), Self::build_get_one_params(value))
+            }
+            /// build both the sql statement and parameters to get a record with id
+            pub fn build_get_one_by_sql_and_params(column: String, value: &str) -> (String, Vec<ParameterValue>) {
+                let sql = Self::build_get_one_by_sql(column);
+                let params = Self::build_get_one_params(value);
+                (sql, params)
             }
             /// build both the sql statement and parameters to insert the record
             pub fn build_insert_sql_and_params(&self) -> (String, Vec<ParameterValue>) {
