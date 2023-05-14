@@ -35,6 +35,14 @@ fn test_get_one_sql() {
 }
 
 #[test]
+fn test_get_one_by_sql() {
+    assert_eq!(
+        "SELECT id, title, content FROM foo WHERE name = $1",
+        Foo::build_get_one_by_sql("name".to_string())
+    );
+}
+
+#[test]
 fn test_get_list_sql() {
     assert_eq!(
         "SELECT id, title, content FROM foo",
@@ -43,6 +51,18 @@ fn test_get_list_sql() {
     assert_eq!(
         "SELECT id, title, content FROM foo LIMIT 10 OFFSET 10",
         Foo::build_get_list_sql(Some(10), Some(10))
+    );
+}
+
+#[test]
+fn test_get_list_by_sql() {
+    assert_eq!(
+        "SELECT id, title, content FROM foo WHERE owner = $1",
+        Foo::build_get_list_by_sql("owner".to_string(), None, None)
+    );
+    assert_eq!(
+        "SELECT id, title, content FROM foo WHERE owner = $1 LIMIT 10 OFFSET 10",
+        Foo::build_get_list_by_sql("owner".to_string(), Some(10), Some(10))
     );
 }
 
