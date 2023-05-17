@@ -38,7 +38,7 @@ fn test_get_one_sql() {
 fn test_get_one_by_sql() {
     assert_eq!(
         "SELECT id, title, content FROM foo WHERE name = $1",
-        Foo::build_get_one_by_sql("name".to_string())
+        Foo::build_get_one_by_sql("name")
     );
 }
 
@@ -54,7 +54,7 @@ fn test_get_list_sql() {
 fn test_get_list_by_sql() {
     assert_eq!(
         "SELECT id, title, content FROM foo WHERE owner = $1 LIMIT 10 OFFSET 10",
-        Foo::build_get_list_by_sql("owner".to_string(), 10, 10)
+        Foo::build_get_list_by_sql("owner", 10, 10)
     );
 }
 
