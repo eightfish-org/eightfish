@@ -2,7 +2,7 @@
 use anyhow::{anyhow, bail, Result};
 use bytes::Bytes;
 use eightfish::{
-    App as EightFishApp, Handler, Method, Request as EightFishRequest,
+    App as EightFishApp, Handler, HandlerCRUD, Method, Request as EightFishRequest,
     Response as EightFishResponse,
 };
 use serde::Deserialize;
@@ -74,7 +74,8 @@ impl Worker {
                         println!("Worker::work: in query branch: ef_res: {:?}", ef_res);
                         // we check the intermediate result  in the framework internal
                         let pair_list =
-                            inner_stuffs_on_query_result(&redis_addr, &pg_addr, &reqid, &ef_res).unwrap();
+                            inner_stuffs_on_query_result(&redis_addr, &pg_addr, &reqid, &ef_res)
+                                .unwrap();
                         println!("Worker::work: in query branch: pair_list: {:?}", pair_list);
 
                         if pair_list.is_some() {
@@ -82,7 +83,12 @@ impl Worker {
                             // we can retrieve the model name from the path
                             // but that will force the developer use a strict unified url shcema in his product
                             // the names in query and post must MATCH
-                            tail_query_process(&redis_addr, &reqid, &modelname, &pair_list.unwrap());
+                            tail_query_process(
+                                &redis_addr,
+                                &reqid,
+                                &modelname,
+                                &pair_list.unwrap(),
+                            );
                         }
                     }
                     Err(err) => {
@@ -99,7 +105,7 @@ impl Worker {
                                     &CACHE_RESULTS.replace('#', &reqid),
                                     b"Not Found",
                                 );
-                            },
+                            }
                             Some(s) => {
                                 // write not found msg to cache
                                 _ = redis::set(
@@ -112,7 +118,7 @@ impl Worker {
                                     &CACHE_RESULTS.replace('#', &reqid),
                                     &s.as_bytes(),
                                 );
-                            },
+                            }
                             None => {
                                 // write not found msg to cache
                                 _ = redis::set(
@@ -125,7 +131,7 @@ impl Worker {
                                     &CACHE_RESULTS.replace('#', &reqid),
                                     &format!("{}", err).as_bytes(),
                                 );
-                            },
+                            }
                         }
                         return Err(anyhow!("query error"));
                     }
@@ -169,7 +175,7 @@ impl Worker {
                         let modelname = ef_res.info().model_name.to_owned();
 
                         tail_post_process(&redis_addr, &reqid, &modelname, &pair_list);
-                    },
+                    }
                     Err(err) => {
                         match err.downcast_ref::<&str>() {
                             Some(&"404") => {
@@ -184,7 +190,7 @@ impl Worker {
                                     &CACHE_RESULTS.replace('#', &reqid),
                                     b"Not Found",
                                 );
-                            },
+                            }
                             Some(s) => {
                                 // write not found msg to cache
                                 _ = redis::set(
@@ -197,7 +203,7 @@ impl Worker {
                                     &CACHE_RESULTS.replace('#', &reqid),
                                     &s.as_bytes(),
                                 );
-                            },
+                            }
                             None => {
                                 // write not found msg to cache
                                 _ = redis::set(
@@ -210,7 +216,7 @@ impl Worker {
                                     &CACHE_RESULTS.replace('#', &reqid),
                                     &format!("{}", err).as_bytes(),
                                 );
-                            },
+                            }
                         }
                         return Err(anyhow!("post error"));
                     }
@@ -412,7 +418,6 @@ fn inner_stuffs_on_query_result(
 fn inner_stuffs_on_post_result(res: &EightFishResponse) -> Result<Vec<(String, String)>> {
     let pg_addr = std::env::var(DB_URL_ENV)?;
     let table_name = &res.info().model_name;
-    //let id = &res.info.target;
     let action = &res.info().action;
     let id;
     let ins_hash;
@@ -426,34 +431,38 @@ fn inner_stuffs_on_post_result(res: &EightFishResponse) -> Result<Vec<(String, S
         bail!("No pair.".to_string());
     }
 
-    if action == "new" {
-        let sql_string = format!(
-            "insert into {table_name}_idhash values ('{}', '{}')",
-            id, ins_hash
-        );
-        let _execute_results = pg::execute(&pg_addr, &sql_string, &[]);
-        // TODO: check the pg result
-        println!(
-            "in post stuff: new: _execute_results: {:?}",
-            _execute_results
-        );
-    } else if action == "update" {
-        let sql_string =
-            format!("update {table_name}_idhash set hash='{ins_hash}' where id='{id}'");
-        let _execute_results = pg::execute(&pg_addr, &sql_string, &[]);
-        println!(
-            "in post stuff: update: _execute_results: {:?}",
-            _execute_results
-        );
-    } else if action == "delete" {
-        let sql_string = format!("delete {table_name}_idhash where id='{id}'");
-        let _execute_results = pg::execute(&pg_addr, &sql_string, &[]);
-        // TODO: check the pg result
-        println!(
-            "in post stuff: delete: _execute_results: {:?}",
-            _execute_results
-        );
-    } else {
+    match action {
+        HandlerCRUD::Create => {
+            let sql_string = format!(
+                "insert into {table_name}_idhash values ('{}', '{}')",
+                id, ins_hash
+            );
+            let _execute_results = pg::execute(&pg_addr, &sql_string, &[]);
+            // TODO: check the pg result
+            println!(
+                "in post stuff: new: _execute_results: {:?}",
+                _execute_results
+            );
+        }
+        HandlerCRUD::Update => {
+            let sql_string =
+                format!("update {table_name}_idhash set hash='{ins_hash}' where id='{id}'");
+            let _execute_results = pg::execute(&pg_addr, &sql_string, &[]);
+            println!(
+                "in post stuff: update: _execute_results: {:?}",
+                _execute_results
+            );
+        }
+        HandlerCRUD::Delete => {
+            let sql_string = format!("delete {table_name}_idhash where id='{id}'");
+            let _execute_results = pg::execute(&pg_addr, &sql_string, &[]);
+            // TODO: check the pg result
+            println!(
+                "in post stuff: delete: _execute_results: {:?}",
+                _execute_results
+            );
+        }
+        _ => unreachable!(),
     }
 
     let pair_list: Vec<(String, String)> = vec![(id, ins_hash)];

@@ -10,21 +10,20 @@ pub use crate::router_m::Router;
 /// EightFish Error
 // #[derive(Debug, PartialEq, Clone)]
 // pub enum Error {
-    //InvalidConfig,
-    //InvalidRouterConfig,
-    //FileNotExist,
-    // NotFound,
-    //Unauthorized,                // 401
-    //Forbidden,                   // 403
-    //Break(String),               // 400
-    // InternalServerError(String), // 500
-                                 //Found(String),               // 301
-                                 //TemporaryRedirect(String),   // 307
-                                 //Custom(String),
-                                 //CustomHtml(String),
-                                 //CustomJson(String),
+//InvalidConfig,
+//InvalidRouterConfig,
+//FileNotExist,
+// NotFound,
+//Unauthorized,                // 401
+//Forbidden,                   // 403
+//Break(String),               // 400
+// InternalServerError(String), // 500
+//Found(String),               // 301
+//TemporaryRedirect(String),   // 307
+//Custom(String),
+//CustomHtml(String),
+//CustomJson(String),
 // }
-
 
 pub type Error = anyhow::Error;
 /// EightFish result struct
@@ -169,4 +168,14 @@ impl EightFishHandler for EightFishApp {
                 }
         */
     }
+}
+
+#[derive(Debug, Default)]
+pub enum EightFishHandlerCRUD {
+    #[default]
+    GetOne,
+    List,
+    Create,
+    Update,
+    Delete,
 }

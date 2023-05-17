@@ -8,6 +8,7 @@ mod router;
 mod router_m;
 
 pub use app::EightFishApp as App;
+pub use app::EightFishHandlerCRUD as HandlerCRUD;
 pub use app::EightFishModule as Module;
 pub use app::EightFishRouter as Router;
 pub use app::GlobalFilter;
