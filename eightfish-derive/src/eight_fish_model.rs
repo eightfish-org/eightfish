@@ -17,9 +17,6 @@
 //!ParameterValue::Binary(v)
 //!ParameterValue::DbNull
 //!
-//!
-//!
-//!
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{Data, DataStruct, DeriveInput, Fields, Type};
@@ -100,7 +97,7 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
                 #ident_string.to_string().to_lowercase()
             }
             /// get the field names of the model, separated by commas
-            pub fn field_names() -> Vec<String> {
+            pub fn fields() -> Vec<String> {
                 let astr = format!("{}", #field_names);
                 astr.replace(" ", "").split(",").map(|x|x.to_owned()).collect()
             }
@@ -121,27 +118,27 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
                 settings
             }
             /// build the sql to get a record with id
-            pub fn sql_get_one_by_id() -> String {
+            pub fn sql_get_by_id() -> String {
                 sql_builder::SqlBuilder::select_from(Self::model_name())
-                    .fields(&Self::field_names())
+                    .fields(&Self::fields())
                     .and_where_eq("id", "$1")
                     .sql().unwrap()
             }
             /// build the parameters for the sql statement to get a record with id
-            pub fn params_get_one_by_id(value: &str) -> Vec<ParameterValue> {
+            pub fn params_get_by_id(value: &str) -> Vec<ParameterValue> {
                 let mut param_vec: Vec<ParameterValue> = Vec::new();
                 param_vec.push(ParameterValue::Str(value));
                 param_vec
             }
             /// build both the sql statement and parameters to get a record with id
-            pub fn build_get_one_by_id(value: &str) -> (String, Vec<ParameterValue>) {
-                (Self::sql_get_one_by_id(), Self::params_get_one_by_id(value))
+            pub fn build_get_by_id(value: &str) -> (String, Vec<ParameterValue>) {
+                (Self::sql_get_by_id(), Self::params_get_by_id(value))
             }
 
             /// build the sql insert the record
             pub fn sql_insert() -> String {
                 sql_builder::SqlBuilder::insert_into(Self::model_name())
-                    .fields(&Self::field_names())
+                    .fields(&Self::fields())
                     .values(&[Self::row_placeholders()])
                     .sql().unwrap()
             }

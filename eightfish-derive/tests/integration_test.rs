@@ -25,13 +25,13 @@ fn test_model_names() {
 #[test]
 fn test_struct_names() {
     let vec = vec!["id".to_string(), "title".to_string(), "content".to_string()];
-    assert_eq!(vec, Foo::field_names());
+    assert_eq!(vec, Foo::fields());
 }
 #[test]
 fn test_get_one_sql() {
     assert_eq!(
         "SELECT id, title, content FROM foo WHERE id = $1;",
-        Foo::sql_get_one_by_id()
+        Foo::sql_get_by_id()
     );
 }
 
@@ -154,7 +154,7 @@ fn test_build_update_sql_and_params() {
 #[test]
 fn test_build_get_one_sql_and_params() {
     let id = "id";
-    let (statement, params) = Foo::build_get_one_by_id(id);
+    let (statement, params) = Foo::build_get_by_id(id);
 
     assert_eq!(
         "SELECT id, title, content FROM foo WHERE id = $1;",
