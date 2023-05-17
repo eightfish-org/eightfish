@@ -24,58 +24,35 @@ fn test_model_names() {
 
 #[test]
 fn test_struct_names() {
-    assert_eq!("id, title, content", Foo::field_names());
+    let vec = vec!["id".to_string(), "title".to_string(), "content".to_string()];
+    assert_eq!(vec, Foo::field_names());
 }
 #[test]
 fn test_get_one_sql() {
     assert_eq!(
-        "SELECT id, title, content FROM foo WHERE id = $1",
-        Foo::build_get_one_sql()
-    );
-}
-
-#[test]
-fn test_get_one_by_sql() {
-    assert_eq!(
-        "SELECT id, title, content FROM foo WHERE name = $1",
-        Foo::build_get_one_by_sql("name")
-    );
-}
-
-#[test]
-fn test_get_list_sql() {
-    assert_eq!(
-        "SELECT id, title, content FROM foo LIMIT 10 OFFSET 10",
-        Foo::build_get_list_sql(10, 10)
-    );
-}
-
-#[test]
-fn test_get_list_by_sql() {
-    assert_eq!(
-        "SELECT id, title, content FROM foo WHERE owner = $1 LIMIT 10 OFFSET 10",
-        Foo::build_get_list_by_sql("owner", 10, 10)
+        "SELECT id, title, content FROM foo WHERE id = $1;",
+        Foo::sql_get_one_by_id()
     );
 }
 
 #[test]
 fn test_insert_sql() {
     assert_eq!(
-        "INSERT INTO foo(id, title, content) VALUES ($1, $2, $3)",
-        Foo::build_insert_sql()
+        "INSERT INTO foo (id, title, content) VALUES ($1, $2, $3);",
+        Foo::sql_insert()
     );
 }
 
 #[test]
 fn test_update_sql() {
     assert_eq!(
-        "UPDATE foo SET id = $1, title = $2, content = $3 WHERE id = $1",
-        Foo::build_update_sql()
+        "UPDATE foo SET id = $1, title = $2, content = $3 WHERE id = $1;",
+        Foo::sql_update()
     );
 }
 #[test]
 fn test_delete_sql() {
-    assert_eq!("DELETE FROM foo WHERE id = $1", Foo::build_delete_sql());
+    assert_eq!("DELETE FROM foo WHERE id = $1;", Foo::sql_delete());
 }
 
 #[test]
@@ -88,7 +65,7 @@ fn test_build_insert_param() {
         title: title.clone(),
         content: content.clone(),
     };
-    let params = f.build_insert_params();
+    let params = f.params_insert();
     let params_str = params
         .iter()
         .map(|p| {
@@ -112,7 +89,7 @@ fn test_build_insert_param_mix_type() {
         synced: true,
         like: 100,
     };
-    let params = f.build_insert_params();
+    let params = f.params_insert();
     assert!(matches!(params[0], ParameterValue::Str("id")));
     assert!(matches!(params[2], ParameterValue::Boolean(true)));
     assert!(matches!(params[3], ParameterValue::Int64(100)));
@@ -128,7 +105,7 @@ fn test_build_update_param() {
         title: title.to_string(),
         content: content.to_string(),
     };
-    let params = f.build_update_params();
+    let params = f.params_update();
     assert!(matches!(params[0], ParameterValue::Str(_id)));
     assert!(matches!(params[1], ParameterValue::Str(_title)));
     assert!(matches!(params[2], ParameterValue::Str(_content)));
@@ -143,9 +120,9 @@ fn test_build_insert_sql_and_params() {
         title: title.to_string(),
         content: content.to_string(),
     };
-    let (statement, params) = f.build_insert_sql_and_params();
+    let (statement, params) = f.build_insert();
     assert_eq!(
-        "INSERT INTO foo(id, title, content) VALUES ($1, $2, $3)",
+        "INSERT INTO foo (id, title, content) VALUES ($1, $2, $3);",
         statement
     );
     assert!(matches!(params[0], ParameterValue::Str(_id)));
@@ -163,10 +140,10 @@ fn test_build_update_sql_and_params() {
         title: title.clone(),
         content: content.clone(),
     };
-    let (statement, params) = f.build_update_sql_and_params();
+    let (statement, params) = f.build_update();
 
     assert_eq!(
-        "UPDATE foo SET id = $1, title = $2, content = $3 WHERE id = $1",
+        "UPDATE foo SET id = $1, title = $2, content = $3 WHERE id = $1;",
         statement
     );
     assert!(matches!(params[0], ParameterValue::Str(_id)));
@@ -177,10 +154,10 @@ fn test_build_update_sql_and_params() {
 #[test]
 fn test_build_get_one_sql_and_params() {
     let id = "id";
-    let (statement, params) = Foo::build_get_one_sql_and_params(id);
+    let (statement, params) = Foo::build_get_one_by_id(id);
 
     assert_eq!(
-        "SELECT id, title, content FROM foo WHERE id = $1",
+        "SELECT id, title, content FROM foo WHERE id = $1;",
         statement
     );
     assert!(matches!(params[0], ParameterValue::Str(_id)));
@@ -189,9 +166,9 @@ fn test_build_get_one_sql_and_params() {
 #[test]
 fn test_build_delete_sql_and_params() {
     let id = "id";
-    let (statement, params) = Foo::build_delete_sql_and_params(id);
+    let (statement, params) = Foo::build_delete(id);
 
-    assert_eq!("DELETE FROM foo WHERE id = $1", statement);
+    assert_eq!("DELETE FROM foo WHERE id = $1;", statement);
     assert!(matches!(params[0], ParameterValue::Str(_id)));
 }
 
