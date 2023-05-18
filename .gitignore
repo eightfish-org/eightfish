@@ -1,2 +1,5 @@
 /**/target
 /Cargo.lock
+
+build_docker_with_proxy_1st.sh
+

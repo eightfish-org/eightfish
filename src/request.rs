@@ -49,11 +49,13 @@ impl EightFishRequest {
         &mut self.ext
     }
 
-    pub fn parse_urlencoded(&self) -> HashMap<String, String> {
+    /// parse urlencoded url or form data
+    // TODO: return a result
+    pub fn parse_urlencoded(&self) -> ::std::result::Result<HashMap<String, String>, String> {
         let mut params: HashMap<String, String> = HashMap::new();
 
-        if self.data.is_some() {
-            let _parse = form_urlencoded::parse(self.data.as_ref().unwrap().as_bytes());
+        if let Some(ref data) = self.data {
+            let _parse = form_urlencoded::parse(data.as_bytes());
             for pair in _parse {
                 let key = pair.0.to_string();
                 let val = pair.1.to_string();
@@ -61,6 +63,6 @@ impl EightFishRequest {
             }
         }
 
-        params
+        Ok(params)
     }
 }

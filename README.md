@@ -1,3 +1,11 @@
+<br/>
+<p align="center">
+<a href=" " target="_blank">
+<img src="https://github.com/eightfish-org/eightfish_assets/blob/c101e136bf5cf253b54dd955b787fa12b61f6974/logo_for_lightbg.png" width="240" alt="eightfish logo">
+</a >
+</p >
+<br/>
+
 # EightFish
 
 What is EightFish?
@@ -14,9 +22,7 @@ Note: EightFish itself is not a service/platform/serverless, it is just a dev fr
 
 ## Status
 
-W3F grant milestone II.
-
-Currently this project is under heavily coding, the status is before alpha-releasing.
+Currently this project is under heavily coding, the status is before alpha-release.
 
 ## Docker and Tests
 

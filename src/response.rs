@@ -1,3 +1,4 @@
+use crate::HandlerCRUD;
 use serde::Serialize;
 
 /// Response status
@@ -11,8 +12,7 @@ pub enum Status {
 #[derive(Default, Debug)]
 pub struct Info {
     pub model_name: String,
-    pub action: String,
-    pub target: String,
+    pub action: HandlerCRUD,
     pub extra: String,
 }
 
@@ -63,21 +63,14 @@ impl EightFishResponse {
         }
     }
 
-    pub fn from_str(
-        status: Status,
-        info: Info,
-        aresults: String,
-    ) -> EightFishResponse {
-
+    pub fn from_str(status: Status, info: Info, aresults: String) -> EightFishResponse {
         EightFishResponse {
             status,
             info,
             pair_list: None,
             results: Some(aresults),
         }
-
     }
-    
 
     /// get response status
     pub fn status(&self) -> Status {
