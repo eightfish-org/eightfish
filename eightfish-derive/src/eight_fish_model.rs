@@ -119,28 +119,20 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
             }
 
             /// build the sql to get a record with id
-            pub fn build_get_one_by_sql(column: String) -> String {
+            pub fn build_get_one_by_sql(column: &str) -> String {
                 format!("SELECT {} FROM {} WHERE {} = $1", #field_names, #ident_string.to_string().to_lowercase(), column)
             }
 
             /// build the sql to get a list of records, with optional limit and offset
-            pub fn build_get_list_sql(limit: Option<u64>, offset: Option<u64>) -> String {
-                let query = format!("SELECT {} FROM {}", #field_names, #ident_string.to_string().to_lowercase());
-                match (limit, offset) {
-                    (Some(l), Some(o)) => format!("{} LIMIT {} OFFSET {}", query, l, o),
-                    (Some(l), None) => format!("{} LIMIT {}", query, l),
-                    _ => query
-                }
+            pub fn build_get_list_sql(limit: u64, offset: u64) -> String {
+                let query = format!("SELECT {} FROM {} LIMIT {} OFFSET {}", #field_names, #ident_string.to_string().to_lowercase(), limit, offset);
+                query
             }
 
             /// build the sql to get a list of records, with optional limit and offset
-            pub fn build_get_list_by_sql(column: String, limit: Option<u64>, offset: Option<u64>) -> String {
-                let query = format!("SELECT {} FROM {} WHERE {} = $1", #field_names, #ident_string.to_string().to_lowercase(), column);
-                match (limit, offset) {
-                    (Some(l), Some(o)) => format!("{} LIMIT {} OFFSET {}", query, l, o),
-                    (Some(l), None) => format!("{} LIMIT {}", query, l),
-                    _ => query
-                }
+            pub fn build_get_list_by_sql(column: &str, limit: u64, offset: u64) -> String {
+                let query = format!("SELECT {} FROM {} WHERE {} = $1 LIMIT {} OFFSET {}", #field_names, #ident_string.to_string().to_lowercase(), column, limit, offset);
+                query
             }
 
             /// build the sql insert the record
@@ -189,8 +181,9 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
                 )*
                 param_vec
             }
+
             /// build both the sql statement and parameters to get a list record with column
-            pub fn build_get_list_by_sql_and_params(column: String, value: &str, limit: Option<u64>, offset: Option<u64>) -> (String, Vec<ParameterValue>) {
+            pub fn build_get_list_by_sql_and_params<'a, 'b>(column: &'a str, value: &'b str, limit: u64, offset: u64) -> (String, Vec<ParameterValue<'b>>) {
                 let sql = Self::build_get_list_by_sql(column, limit, offset);
                 let params = Self::build_get_one_params(value);
                 (sql, params)
@@ -200,7 +193,7 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
                 (Self::build_get_one_sql(), Self::build_get_one_params(value))
             }
             /// build both the sql statement and parameters to get a record with id
-            pub fn build_get_one_by_sql_and_params(column: String, value: &str) -> (String, Vec<ParameterValue>) {
+            pub fn build_get_one_by_sql_and_params<'a, 'b>(column: &'a str, value: &'b str) -> (String, Vec<ParameterValue<'b>>) {
                 let sql = Self::build_get_one_by_sql(column);
                 let params = Self::build_get_one_params(value);
                 (sql, params)
