@@ -17,9 +17,6 @@
 //!ParameterValue::Binary(v)
 //!ParameterValue::DbNull
 //!
-//!
-//!
-//!
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{Data, DataStruct, DeriveInput, Fields, Type};
@@ -37,6 +34,7 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
     let field_identifiers = fields.iter().map(|f| &f.ident);
     let field_identifiers_for_names = field_identifiers.clone();
     let field_names = format!("{}", quote! {#(#field_identifiers_for_names),*});
+    // let field_names = quote! {#(#field_identifiers_for_names),*};
 
     let field_placeholders = fields
         .iter()
@@ -71,6 +69,11 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
                     param_vec.push(ParameterValue::Int64(self.#field_name));
                 }
             }
+            Type::Path(type_path) if type_path.clone().into_token_stream().to_string() == "i32" => {
+                quote! {
+                    param_vec.push(ParameterValue::Int32(self.#field_name));
+                }
+            }
             Type::Path(type_path) if type_path.clone().into_token_stream().to_string() == "i16" => {
                 quote! {
                     param_vec.push(ParameterValue::Int16(self.#field_name));
@@ -94,8 +97,9 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
                 #ident_string.to_string().to_lowercase()
             }
             /// get the field names of the model, separated by commas
-            pub fn field_names() -> String {
-                format!("{}", #field_names)
+            pub fn fields() -> Vec<String> {
+                let astr = format!("{}", #field_names);
+                astr.replace(" ", "").split(",").map(|x|x.to_owned()).collect()
             }
             /// get the update placeholders of the model, in format of "field1 = $1, field2 = $2"
             pub fn update_placeholders() -> String {
@@ -114,101 +118,73 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
                 settings
             }
             /// build the sql to get a record with id
-            pub fn build_get_one_sql() -> String {
-                format!("SELECT {} FROM {} WHERE id = $1", #field_names, #ident_string.to_string().to_lowercase())
+            pub fn sql_get_by_id() -> String {
+                sql_builder::SqlBuilder::select_from(Self::model_name())
+                    .fields(&Self::fields())
+                    .and_where_eq("id", "$1")
+                    .sql().unwrap()
             }
-
-            /// build the sql to get a record with id
-            pub fn build_get_one_by_sql(column: &str) -> String {
-                format!("SELECT {} FROM {} WHERE {} = $1", #field_names, #ident_string.to_string().to_lowercase(), column)
+            /// build the parameters for the sql statement to get a record with id
+            pub fn params_get_by_id(value: &str) -> Vec<ParameterValue> {
+                let mut param_vec: Vec<ParameterValue> = Vec::new();
+                param_vec.push(ParameterValue::Str(value));
+                param_vec
             }
-
-            /// build the sql to get a list of records, with optional limit and offset
-            pub fn build_get_list_sql(limit: u64, offset: u64) -> String {
-                let query = format!("SELECT {} FROM {} LIMIT {} OFFSET {}", #field_names, #ident_string.to_string().to_lowercase(), limit, offset);
-                query
-            }
-
-            /// build the sql to get a list of records, with optional limit and offset
-            pub fn build_get_list_by_sql(column: &str, limit: u64, offset: u64) -> String {
-                let query = format!("SELECT {} FROM {} WHERE {} = $1 LIMIT {} OFFSET {}", #field_names, #ident_string.to_string().to_lowercase(), column, limit, offset);
-                query
+            /// build both the sql statement and parameters to get a record with id
+            pub fn build_get_by_id(value: &str) -> (String, Vec<ParameterValue>) {
+                (Self::sql_get_by_id(), Self::params_get_by_id(value))
             }
 
             /// build the sql insert the record
-            pub fn build_insert_sql() -> String {
-                format!("INSERT INTO {}({}) VALUES ({})", #ident_string.to_string().to_lowercase(), #field_names, #field_placeholders.to_string().replace("\"", ""))
-            }
-            /// build the sql to update the record
-            pub fn build_update_sql() -> String {
-                format!("UPDATE {} SET {} WHERE id = $1", #ident_string.to_string().to_lowercase(), #update_field_placeholders.to_string().replace("\"", ""))
-            }
-            /// build the sql to delete the record
-            pub fn build_delete_sql() -> String {
-                format!("DELETE FROM {} WHERE id = $1", #ident_string.to_string().to_lowercase())
-            }
-            /// build the parameters for the sql statement to get a record with id
-            pub fn build_get_list_by_params(value: &str) -> Vec<ParameterValue> {
-                let mut param_vec: Vec<ParameterValue> = Vec::new();
-                param_vec.push(ParameterValue::Str(value));
-                param_vec
-            }
-            /// build the parameters for the sql statement to get a record with id
-            pub fn build_get_one_params(value: &str) -> Vec<ParameterValue> {
-                let mut param_vec: Vec<ParameterValue> = Vec::new();
-                param_vec.push(ParameterValue::Str(value));
-                param_vec
-            }
-            /// build the parameters for the sql statement to delete the record
-            pub fn build_delete_params(id: &str) -> Vec<ParameterValue> {
-                let mut param_vec: Vec<ParameterValue> = Vec::new();
-                param_vec.push(ParameterValue::Str(id));
-                param_vec
+            pub fn sql_insert() -> String {
+                sql_builder::SqlBuilder::insert_into(Self::model_name())
+                    .fields(&Self::fields())
+                    .values(&[Self::row_placeholders()])
+                    .sql().unwrap()
             }
             /// build the parameters for the sql statement to insert the record
-            pub fn build_insert_params(&self) -> Vec<ParameterValue> {
+            pub fn params_insert(&self) -> Vec<ParameterValue> {
                 let mut param_vec: Vec<ParameterValue> = Vec::new();
                 #(
                     #create_params
                 )*
                 param_vec
             }
+            /// build both the sql statement and parameters to insert the record
+            pub fn build_insert(&self) -> (String, Vec<ParameterValue>) {
+                (Self::sql_insert(), self.params_insert())
+            }
+
+            /// build the sql to update the record
+            pub fn sql_update() -> String {
+                format!("UPDATE {} SET {} WHERE id = $1;", Self::model_name(), Self::update_placeholders())
+            }
             /// build the parameters for the sql statement to update the record
-            pub fn build_update_params(&self) -> Vec<ParameterValue> {
+            pub fn params_update(&self) -> Vec<ParameterValue> {
                 let mut param_vec: Vec<ParameterValue> = Vec::new();
                 #(
                     #update_params
                 )*
                 param_vec
             }
-
-            /// build both the sql statement and parameters to get a list record with column
-            pub fn build_get_list_by_sql_and_params<'a, 'b>(column: &'a str, value: &'b str, limit: u64, offset: u64) -> (String, Vec<ParameterValue<'b>>) {
-                let sql = Self::build_get_list_by_sql(column, limit, offset);
-                let params = Self::build_get_one_params(value);
-                (sql, params)
-            }
-            /// build both the sql statement and parameters to get a record with id
-            pub fn build_get_one_sql_and_params(value: &str) -> (String, Vec<ParameterValue>) {
-                (Self::build_get_one_sql(), Self::build_get_one_params(value))
-            }
-            /// build both the sql statement and parameters to get a record with id
-            pub fn build_get_one_by_sql_and_params<'a, 'b>(column: &'a str, value: &'b str) -> (String, Vec<ParameterValue<'b>>) {
-                let sql = Self::build_get_one_by_sql(column);
-                let params = Self::build_get_one_params(value);
-                (sql, params)
-            }
-            /// build both the sql statement and parameters to insert the record
-            pub fn build_insert_sql_and_params(&self) -> (String, Vec<ParameterValue>) {
-                (Self::build_insert_sql(), self.build_insert_params())
-            }
             /// build both the sql statement and parameters to update the record
-            pub fn build_update_sql_and_params(&self) -> (String, Vec<ParameterValue>) {
-                (Self::build_update_sql(), self.build_update_params())
+            pub fn build_update(&self) -> (String, Vec<ParameterValue>) {
+                (Self::sql_update(), self.params_update())
+            }
+
+            /// build the sql to delete the record
+            pub fn sql_delete() -> String {
+                format!("DELETE FROM {} WHERE id = $1;", Self::model_name())
+            }
+            /// build the parameters for the sql statement to delete the record
+            pub fn params_delete(id: &str) -> Vec<ParameterValue> {
+                let mut param_vec: Vec<ParameterValue> = Vec::new();
+                param_vec.push(ParameterValue::Str(id));
+                param_vec
             }
             /// build both the sql statement and parameters to delete a record with given id
-            pub fn build_delete_sql_and_params(id: &str) -> (String, Vec<ParameterValue>) {
-                (Self::build_delete_sql(), Self::build_delete_params(id))
+            pub fn build_delete(id: &str) -> (String, Vec<ParameterValue>) {
+                (Self::sql_delete(), Self::params_delete(id))
             }
         }
         impl EightFishModel for #ident {
