@@ -22,7 +22,12 @@ Note: EightFish itself is not a service/platform/serverless, it is just a dev fr
 
 ## Status
 
-Currently this project is under heavily coding, the status is before alpha-release.
+The status is before MVP, we are working on one use case of this:
+
+- [GUTP](https://github.com/eightfish-org/gutp): A General User Text Persistence protocol, built using EightFish
+- [Meblog](https://github.com/miketang84/meblog): A blog system (including backend and frontend) connected to GUTP. 
+
+Soon you will get a concrete picture that how EightFish works.
 
 ## Docker and Tests
 
