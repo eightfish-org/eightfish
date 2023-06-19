@@ -1,4 +1,7 @@
-use eightfish::{EightFishModel, Info, Module, Request, Response, Result, Router, Status};
+use anyhow::{anyhow, bail};
+use eightfish::{
+    EightFishModel, HandlerCRUD, Info, Module, Request, Response, Result, Router, Status,
+};
 use eightfish_derive::EightFishModel;
 use serde::{Deserialize, Serialize};
 use spin_sdk::pg::{self, DbValue, Decode, ParameterValue};
@@ -18,141 +21,142 @@ pub struct ArticleModule;
 
 impl ArticleModule {
     fn get_one(req: &mut Request) -> Result<Response> {
-        let pg_addr = std::env::var(DB_URL_ENV).unwrap();
+        let pg_addr = std::env::var(DB_URL_ENV)?;
 
-        let params = req.parse_urlencoded();
-        println!("in handler article: params: {:?}", params);
+        let params = req.parse_urlencoded()?;
+        let article_id = params.get("id").ok_or(anyhow!("id error"))?;
 
-        let article_id = params.get("id").unwrap();
+        let (sql, sql_params) = Article::build_get_by_id(article_id);
+        let rowset = pg::query(&pg_addr, &sql, &sql_params)?;
 
-        // construct a sql statement
-        let (sql_statement, sql_params) =
-            Article::build_get_one_sql_and_params(article_id.as_str());
-        let rowset = pg::query(&pg_addr, &sql_statement, &sql_params).unwrap();
-        println!("in handler article: rowset: {:?}", rowset);
-
-        // convert the raw vec[u8] to every rust struct filed, and convert the whole into a
-        // rust struct vec, later we may find a gerneral type converter way
-        let mut results: Vec<Article> = vec![];
-        for row in rowset.rows {
-            let article = Article::from_row(row);
-            results.push(article);
-        }
-        println!("in handler article: results: {:?}", results);
+        let results = if let Some(row) = rowset.rows.into_iter().next() {
+            vec![Article::from_row(row)]
+        } else {
+            bail!("no this item".to_string());
+        };
 
         let info = Info {
-            model_name: "article".to_string(),
-            action: "get_one".to_string(),
-            target: article_id.clone(),
+            model_name: Article::model_name(),
+            action: HandlerCRUD::GetOne,
             extra: "".to_string(),
         };
 
-        let response = Response::new(Status::Successful, info, results);
-
-        Ok(response)
+        Ok(Response::new(Status::Successful, info, results))
     }
 
     fn new_article(req: &mut Request) -> Result<Response> {
-        let pg_addr = std::env::var(DB_URL_ENV).unwrap();
+        let pg_addr = std::env::var(DB_URL_ENV)?;
 
-        let params = req.parse_urlencoded();
+        let params = req.parse_urlencoded()?;
+        let title = params
+            .get("title")
+            .ok_or(anyhow!("title error"))?
+            .to_owned();
+        let content = params
+            .get("content")
+            .ok_or(anyhow!("content error"))?
+            .to_owned();
+        let authorname = params
+            .get("authorname")
+            .ok_or(anyhow!("authorname error"))?
+            .to_owned();
+        let id = req
+            .ext()
+            .get("random_str")
+            .ok_or(anyhow!("id error"))?
+            .to_owned();
 
-        let title = params.get("title").unwrap();
-        let content = params.get("content").unwrap();
-        let authorname = params.get("authorname").unwrap();
-
-        let id = req.ext().get("random_str").unwrap();
-
-        // construct a struct
         let article = Article {
-            id: id.clone(),
-            title: title.clone(),
-            content: content.clone(),
-            authorname: authorname.clone(),
+            id,
+            title,
+            content,
+            authorname,
         };
 
-        // construct a sql statement and param
-        let (sql_statement, sql_params) = article.build_insert_sql_and_params();
-        let _execute_results = pg::execute(&pg_addr, &sql_statement, &sql_params);
-        println!(
-            "in handler article_new: _execute_results: {:?}",
-            _execute_results
-        );
+        let (sql_statement, sql_params) = article.build_insert();
+        _ = pg::execute(&pg_addr, &sql_statement, &sql_params)?;
 
         let results: Vec<Article> = vec![article];
 
         let info = Info {
-            model_name: "article".to_string(),
-            action: "new".to_string(),
-            target: id.clone(),
+            model_name: Article::model_name(),
+            action: HandlerCRUD::Create,
             extra: "".to_string(),
         };
 
-        let response = Response::new(Status::Successful, info, results);
-
-        Ok(response)
+        Ok(Response::new(Status::Successful, info, results))
     }
 
     fn update(req: &mut Request) -> Result<Response> {
-        let pg_addr = std::env::var(DB_URL_ENV).unwrap();
+        let pg_addr = std::env::var(DB_URL_ENV)?;
 
-        let params = req.parse_urlencoded();
+        let params = req.parse_urlencoded()?;
 
-        let id = params.get("id").unwrap();
-        let title = params.get("title").unwrap();
-        let content = params.get("content").unwrap();
-        let authorname = params.get("authorname").unwrap();
+        let id = params.get("id").ok_or(anyhow!("id error"))?.to_owned();
+        let title = params
+            .get("title")
+            .ok_or(anyhow!("title error"))?
+            .to_owned();
+        let content = params
+            .get("content")
+            .ok_or(anyhow!("content error"))?
+            .to_owned();
+        let authorname = params
+            .get("authorname")
+            .ok_or(anyhow!("authorname error"))?
+            .to_owned();
 
-        // construct a struct
-        let article = Article {
-            id: id.clone(),
-            title: title.clone(),
-            content: content.clone(),
-            authorname: authorname.clone(),
-        };
+        let (sql, sql_params) = Article::build_get_by_id(id.as_str());
+        let rowset = pg::query(&pg_addr, &sql, &sql_params)?;
+        match rowset.rows.into_iter().next() {
+            Some(row) => {
+                let old_article = Article::from_row(row);
 
-        // construct a sql statement and params
-        let (sql_statement, sql_params) = article.build_update_sql_and_params();
-        let _execute_results = pg::execute(&pg_addr, &sql_statement, &sql_params);
+                let article = Article {
+                    id,
+                    title,
+                    content,
+                    authorname,
+                    ..old_article
+                };
 
-        let results: Vec<Article> = vec![article];
+                let (sql, sql_params) = article.build_update();
+                _ = pg::execute(&pg_addr, &sql, &sql_params)?;
 
-        let info = Info {
-            model_name: "article".to_string(),
-            action: "update".to_string(),
-            target: id.clone(),
-            extra: "".to_string(),
-        };
+                let results: Vec<Article> = vec![article];
 
-        let response = Response::new(Status::Successful, info, results);
+                let info = Info {
+                    model_name: Article::model_name(),
+                    action: HandlerCRUD::Update,
+                    extra: "".to_string(),
+                };
 
-        Ok(response)
+                Ok(Response::new(Status::Successful, info, results))
+            }
+            None => {
+                bail!("update action: no item in db");
+            }
+        }
     }
 
     fn delete(req: &mut Request) -> Result<Response> {
-        let pg_addr = std::env::var(DB_URL_ENV).unwrap();
+        let pg_addr = std::env::var(DB_URL_ENV)?;
 
-        let params = req.parse_urlencoded();
+        let params = req.parse_urlencoded()?;
 
-        let id = params.get("id").unwrap();
+        let id = params.get("id").ok_or(anyhow!("id error"))?.to_owned();
 
-        // construct a sql statement
-        let (sql_statement, sql_params) = Article::build_delete_sql_and_params(id.as_str());
-        let _execute_results = pg::execute(&pg_addr, &sql_statement, &sql_params);
-        // TODO check the pg result
-
-        let results: Vec<Article> = vec![];
+        let (sql, sql_params) = Article::build_delete(id.as_str());
+        _ = pg::execute(&pg_addr, &sql, &sql_params)?;
 
         let info = Info {
-            model_name: "article".to_string(),
-            action: "delete".to_string(),
-            target: id.clone(),
+            model_name: Article::model_name(),
+            action: HandlerCRUD::Delete,
             extra: "".to_string(),
         };
+        let results: Vec<Article> = vec![];
 
-        let response = Response::new(Status::Successful, info, results);
-
-        Ok(response)
+        Ok(Response::new(Status::Successful, info, results))
     }
 
     fn version(_req: &mut Request) -> Result<Response> {
@@ -165,11 +169,10 @@ impl ArticleModule {
 
 impl Module for ArticleModule {
     fn router(&self, router: &mut Router) -> Result<()> {
-        router.get("/article/:id", Self::get_one);
-        //router.get("/article/latest", Self::get_latest);
+        router.get("/article", Self::get_one);
         router.post("/article/new", Self::new_article);
         router.post("/article/update", Self::update);
-        router.post("/article/delete/:id", Self::delete);
+        router.post("/article/delete", Self::delete);
 
         router.get("/version", Self::version);
 

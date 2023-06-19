@@ -107,6 +107,7 @@ dependencies = [
  "quote",
  "serde",
  "serde_json",
+ "sql-builder",
  "syn",
 ]
 
@@ -300,6 +301,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "routefinder"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "94f8f99b10dedd317514253dda1fa7c14e344aac96e1f78149a64879ce282aca"
+dependencies = [
+ "smartcow",
+ "smartstring",
+]
+
+[[package]]
 name = "ryu"
 version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -338,7 +349,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "simple"
+name = "simple2"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -351,13 +362,34 @@ dependencies = [
  "serde_json",
  "spin-sdk",
  "spin_worker",
+ "sql-builder",
  "wit-bindgen-rust",
+]
+
+[[package]]
+name = "smartcow"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "656fcb1c1fca8c4655372134ce87d8afdf5ec5949ebabe8d314be0141d8b5da2"
+dependencies = [
+ "smartstring",
+]
+
+[[package]]
+name = "smartstring"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3fb72c633efbaa2dd666986505016c32c3044395ceaf881518399d2f4127ee29"
+dependencies = [
+ "autocfg",
+ "static_assertions",
+ "version_check",
 ]
 
 [[package]]
 name = "spin-macro"
 version = "0.1.0"
-source = "git+https://github.com/fermyon/spin#7cbcd4fa5be15d16d74ab10ce566ec7520b7204d"
+source = "git+https://github.com/fermyon/spin?tag=v1.1.0#28655d57fa3aecfc36f8ff4e14d8390d1a18b350"
 dependencies = [
  "anyhow",
  "bytes",
@@ -365,20 +397,19 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
- "wit-bindgen-gen-core",
- "wit-bindgen-gen-rust-wasm",
  "wit-bindgen-rust",
 ]
 
 [[package]]
 name = "spin-sdk"
-version = "0.8.0"
-source = "git+https://github.com/fermyon/spin#7cbcd4fa5be15d16d74ab10ce566ec7520b7204d"
+version = "1.1.0"
+source = "git+https://github.com/fermyon/spin?tag=v1.1.0#28655d57fa3aecfc36f8ff4e14d8390d1a18b350"
 dependencies = [
  "anyhow",
  "bytes",
  "form_urlencoded",
  "http",
+ "routefinder",
  "spin-macro",
  "thiserror",
  "wit-bindgen-rust",
@@ -400,6 +431,22 @@ dependencies = [
  "spin-sdk",
  "wit-bindgen-rust",
 ]
+
+[[package]]
+name = "sql-builder"
+version = "3.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1008d95d2ec2d062959352527be30e10fec42a1aa5e5a48d990a5ff0fb9bdc0"
+dependencies = [
+ "anyhow",
+ "thiserror",
+]
+
+[[package]]
+name = "static_assertions"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "syn"

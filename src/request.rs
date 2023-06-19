@@ -51,7 +51,9 @@ impl EightFishRequest {
 
     /// parse urlencoded url or form data
     // TODO: return a result
-    pub fn parse_urlencoded(&self) -> ::std::result::Result<HashMap<String, String>, String> {
+    pub fn parse_urlencoded(
+        &self,
+    ) -> ::std::result::Result<HashMap<String, String>, anyhow::Error> {
         let mut params: HashMap<String, String> = HashMap::new();
 
         if let Some(ref data) = self.data {

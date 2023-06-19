@@ -24,4 +24,5 @@ eightfish = {path = "../../"}
 eightfish-derive = {path = "../../eightfish-derive"}
 spin_worker = { path = "../../spin_worker" }
 
+sql-builder = "3.1"
 

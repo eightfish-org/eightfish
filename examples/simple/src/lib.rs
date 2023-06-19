@@ -3,18 +3,18 @@ use anyhow::Result;
 use bytes::Bytes;
 use spin_sdk::redis_component;
 
-use eightfish::{App as EightFishApp, GlobalFilter, Request, Response, Result as EightFishResult};
+use eightfish::{App as EightFishApp, GlobalFilter, Request, Response, Result as EFResult};
 
 mod article;
 
 struct MyGlobalFilter;
 
 impl GlobalFilter for MyGlobalFilter {
-    fn before(&self, _req: &mut Request) -> EightFishResult<()> {
+    fn before(&self, _req: &mut Request) -> EFResult<()> {
         Ok(())
     }
 
-    fn after(&self, _req: &Request, _res: &mut Response) -> EightFishResult<()> {
+    fn after(&self, _req: &Request, _res: &mut Response) -> EFResult<()> {
         Ok(())
     }
 }
