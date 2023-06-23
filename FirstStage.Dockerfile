@@ -1,5 +1,5 @@
 #== First stage: this is the build stage for Substrate. Here we create the binary.
-FROM docker.io/paritytech/ci-linux:1.68.2-bullseye as builder
+FROM paritytech/ci-linux:1.68.2-bullseye as builder
 
 WORKDIR /eightfish
 COPY . .
