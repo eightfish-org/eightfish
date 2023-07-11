@@ -250,10 +250,14 @@ impl Worker {
                 let cache_key = CACHE_STATUS_RESULTS.replace('#', &reqid);
                 _ = redis::set(&redis_addr, &cache_key, b"200");
 
-                // in previous post process, we have set the CACHE_RESULTS
-
-                // let cache_key = CACHE_RESULTS.replace('#', &reqid);
-                // _ = redis::set(&redis_addr, &cache_key, result.to_string().as_bytes());
+                // in previous post process, we have set the TMP_CACHE_RESULTS
+                let tmpdata = redis::get(&redis_addr, &TMP_CACHE_RESULTS.replace('#', &reqid));
+                if let Ok(tmpdata) = tmpdata {
+                    // set to CACHE_RESULTS
+                    let _ = redis::set(&redis_addr, &CACHE_RESULTS.replace('#', &reqid), &tmpdata);
+                }
+                // delete the tmp cache
+                _ = redis::del(&redis_addr, &[&TMP_CACHE_RESULTS.replace('#', &reqid)]);
             }
             "check_pair_list" => {
                 let redis_addr = std::env::var(REDIS_URL_ENV)?;
@@ -476,7 +480,7 @@ fn inner_stuffs_on_post_result(
         _ => unreachable!(),
     }
 
-    // write response to cache
+    // write response to tmp cache
     let data_to_cache = res.results().to_owned().unwrap_or("".to_string());
     _ = redis::set(
         &redis_addr,
