@@ -139,6 +139,7 @@ impl Worker {
             }
             "post" => {
                 let redis_addr = std::env::var(REDIS_URL_ENV)?;
+                let pg_addr = std::env::var(DB_URL_ENV)?;
                 let method = Method::Post;
                 let path = msg_obj.model.to_owned();
                 let payload: Payload = serde_json::from_slice(&msg_obj.data)?;
@@ -169,7 +170,9 @@ impl Worker {
                 match ef_res {
                     Ok(ef_res) => {
                         println!("Worker::work: in post branch: ef_res: {:?}", ef_res);
-                        let pair_list = inner_stuffs_on_post_result(&ef_res).unwrap();
+                        let pair_list =
+                            inner_stuffs_on_post_result(&redis_addr, &pg_addr, &reqid, &ef_res)
+                                .unwrap();
                         println!("Worker::work: in post branch: pair_list: {:?}", pair_list);
 
                         let modelname = ef_res.info().model_name.to_owned();
@@ -234,20 +237,23 @@ impl Worker {
                 let payload: Payload = serde_json::from_slice(&msg_obj.data)?;
                 println!("callback: update_index: payload: {:?}", payload);
                 let reqid = payload.reqid.to_owned();
-                let id = payload.reqdata.unwrap();
+                // let id = payload.reqdata.unwrap();
 
-                let result = json!({
-                    "result": "Ok",
-                    "id": id,
-                });
+                // let result = json!({
+                //     "result": "Ok",
+                //     "id": id,
+                // });
 
                 // while getting the index updated callback, we put result http_gate wants into redis
                 // cache
                 let redis_addr = std::env::var(REDIS_URL_ENV)?;
                 let cache_key = CACHE_STATUS_RESULTS.replace('#', &reqid);
                 _ = redis::set(&redis_addr, &cache_key, b"200");
-                let cache_key = CACHE_RESULTS.replace('#', &reqid);
-                _ = redis::set(&redis_addr, &cache_key, result.to_string().as_bytes());
+
+                // in previous post process, we have set the CACHE_RESULTS
+
+                // let cache_key = CACHE_RESULTS.replace('#', &reqid);
+                // _ = redis::set(&redis_addr, &cache_key, result.to_string().as_bytes());
             }
             "check_pair_list" => {
                 let redis_addr = std::env::var(REDIS_URL_ENV)?;
@@ -399,7 +405,8 @@ fn inner_stuffs_on_query_result(
 
         Ok(Some(pair_list.to_vec()))
     } else {
-        let data_to_cache = res.results().clone().unwrap_or("".to_string());
+        // in this branch, res.results is None, return empty array as Json type
+        let data_to_cache = "[]".to_string();
         _ = redis::set(
             &redis_addr,
             &CACHE_STATUS_RESULTS.replace('#', &reqid),
@@ -415,8 +422,12 @@ fn inner_stuffs_on_query_result(
     }
 }
 
-fn inner_stuffs_on_post_result(res: &EightFishResponse) -> Result<Vec<(String, String)>> {
-    let pg_addr = std::env::var(DB_URL_ENV)?;
+fn inner_stuffs_on_post_result(
+    redis_addr: &str,
+    pg_addr: &str,
+    reqid: &str,
+    res: &EightFishResponse,
+) -> Result<Vec<(String, String)>> {
     let table_name = &res.info().model_name;
     let action = &res.info().action;
     let id;
@@ -464,6 +475,14 @@ fn inner_stuffs_on_post_result(res: &EightFishResponse) -> Result<Vec<(String, S
         }
         _ => unreachable!(),
     }
+
+    // write response to cache
+    let data_to_cache = res.results().to_owned().unwrap_or("".to_string());
+    _ = redis::set(
+        &redis_addr,
+        &TMP_CACHE_RESULTS.replace('#', reqid),
+        data_to_cache.as_bytes(),
+    );
 
     let pair_list: Vec<(String, String)> = vec![(id, ins_hash)];
 
