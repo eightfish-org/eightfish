@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, Result};
 use bytes::Bytes;
 use eightfish::{
     App as EightFishApp, Handler, HandlerCRUD, Method, Request as EightFishRequest,
@@ -175,9 +175,10 @@ impl Worker {
                                 .unwrap();
                         println!("Worker::work: in post branch: pair_list: {:?}", pair_list);
 
-                        let modelname = ef_res.info().model_name.to_owned();
-
-                        tail_post_process(&redis_addr, &reqid, &modelname, &pair_list);
+                        if !pair_list.is_empty() {
+                            let modelname = ef_res.info().model_name.to_owned();
+                            tail_post_process(&redis_addr, &reqid, &modelname, &pair_list);
+                        }
                     }
                     Err(err) => {
                         match err.downcast_ref::<&str>() {
@@ -409,8 +410,7 @@ fn inner_stuffs_on_query_result(
 
         Ok(Some(pair_list.to_vec()))
     } else {
-        // in this branch, res.results is None, return empty array as Json type
-        let data_to_cache = "[]".to_string();
+        let data_to_cache = res.results().clone().unwrap_or("[]".to_string());
         _ = redis::set(
             &redis_addr,
             &CACHE_STATUS_RESULTS.replace('#', &reqid),
@@ -443,7 +443,19 @@ fn inner_stuffs_on_post_result(
         id = pair.0.clone();
         ins_hash = pair.1.clone();
     } else {
-        bail!("No pair.".to_string());
+        let data_to_cache = "[]".to_string();
+        _ = redis::set(
+            &redis_addr,
+            &CACHE_STATUS_RESULTS.replace('#', &reqid),
+            b"200",
+        );
+        _ = redis::set(
+            &redis_addr,
+            &CACHE_RESULTS.replace('#', &reqid),
+            &data_to_cache.as_bytes(),
+        );
+
+        return Ok(vec![]);
     }
 
     match action {
