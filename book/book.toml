@@ -1,0 +1,6 @@
+[book]
+authors = ["Daogang Tang"]
+language = "en"
+multilingual = false
+src = "src"
+title = "EightFish Book"
