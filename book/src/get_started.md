@@ -1,7 +1,7 @@
 
-## How to Get Started
+# How to Get Started
 
-### Create a new project 
+## Create a new project 
 
 From the template project of ef_example_simple_standalone.
 
@@ -12,10 +12,10 @@ git clone https://github.com/eightfish-org/ef_example_simple_standalone
 Modify this template and git config infomation. 
 
 
-### Compile this repository
+## Compile this repository
 
 ```
-cd <your project dir>
+cd ef_example_simple_standalone
 spin build
 ```
 
@@ -31,18 +31,18 @@ curl -fsSL https://developer.fermyon.com/downloads/install.sh | bash -s -- -v v1
 mv /tmp/spin ~/.cargo/bin/
 ```
 
-### Copy the spin binary to current directory
+## Copy the spin binary to current directory
 
 ```
 cp ~/.cargo/bin/spin .
 ```
-### Build the app docker
+## Build the app docker
 
 ```
 ./build_app.sh
 ```
 
-### Run docker compose.
+## Run docker compose.
 
 ```
 docker compose -f docker-compose-1node.yml up
@@ -50,7 +50,7 @@ docker compose -f docker-compose-1node.yml up
 
 after a while,
 
-### Test
+## Test
 
 We use `hurl` as the client to do testing. You can install it by:
 
