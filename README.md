@@ -10,7 +10,7 @@
 
 What is EightFish?
 
-EightFish is a Web MVC framework to deveop decentralized application.
+EightFish is a web MVC framework to develop decentralized applications.
 
 Deeply, EightFish is a development framework (maybe the first one) for the Open Data Application (ODA), implementing the Open Data Application Model (ODAM). You can think of ODA is a type of data-kind decentralized application of Web3. The theory of ODA and ODAM is located [here](https://medium.com/@daogangtang/the-road-to-open-web-b684879a5571). In a short description: EightFish powers ODAs, ODAs constitute the OpenWeb, which is a subset of Web3.
 
