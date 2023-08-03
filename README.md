@@ -20,9 +20,13 @@ By some elaberate designs, EightFish reaches the experiences of Web2/Internet we
 
 NOTICE: EightFish itself is not a service/platform/serverless/layer, it is just a dev framework tool.
 
+## Get Started
+
+You can read the [EightFish Book](https://eightfish-org.github.io/eightfish-book/) to learn how to get started.
+
 ## Status
 
-The status is before MVP, we are working on one use case of this:
+The status is before Alpha, we are working on one use case of this:
 
 - [GUTP](https://github.com/eightfish-org/gutp): A General User Text Persistence protocol, built using EightFish
 - [Discux](https://github.com/miketang84/discux): A forum system (including backend and frontend) connected to GUTP. 
@@ -31,7 +35,7 @@ Soon you will get a concrete picture that how EightFish works.
 
 ## Docker and Tests
 
-Please follow steps in the [docker doc](https://github.com/eightfish-org/eightfish/blob/master/docs/docker.md) to build and test.
+If you want to compile EightFish step by step, please follow steps in the [docker doc](https://github.com/eightfish-org/eightfish/blob/master/docs/docker.md) to build and test.
 
 ## License
 
