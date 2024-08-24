@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use anyhow::{anyhow, Result};
 use bytes::Bytes;
 use eightfish::{
@@ -13,15 +12,16 @@ use spin_sdk::{
 };
 use std::collections::HashMap;
 
-const REDIS_URL_ENV: &str = "REDIS_URL";
-const DB_URL_ENV: &str = "DB_URL";
+const REDIS_URL_ENV: &str = "REDIS_URL_ENV";
+const DB_URL_ENV: &str = "DB_URL_ENV";
 const TMP_CACHE_RESULTS: &str = "tmp:cache:#";
 const CACHE_STATUS_RESULTS: &str = "cache:status:#";
 const CACHE_RESULTS: &str = "cache:#";
-const CHANNEL_SPIN2PROXY: &str = "spin2proxy";
+const CHANNEL_GATE2VIN: &str = "gate2vin";
 
 #[derive(Deserialize, Debug)]
 pub struct InputOutputObject {
+    proto: String,
     model: String,
     action: String,
     data: Vec<u8>,
@@ -59,6 +59,7 @@ impl Worker {
                 let redis_addr = std::env::var(REDIS_URL_ENV)?;
                 let pg_addr = std::env::var(DB_URL_ENV)?;
                 let method = Method::Get;
+                let proto_name = msg_obj.proto.to_owned();
                 // path info put in the model field from the http_gate
                 let path = msg_obj.model.to_owned();
                 let payload: Payload = serde_json::from_slice(&msg_obj.data)?;
@@ -79,14 +80,15 @@ impl Worker {
                         println!("Worker::work: in query branch: pair_list: {:?}", pair_list);
 
                         if pair_list.is_some() {
-                            let modelname = ef_res.info().model_name.to_owned();
+                            let model_name = ef_res.info().model_name.to_owned();
                             // we can retrieve the model name from the path
                             // but that will force the developer use a strict unified url shcema in his product
                             // the names in query and post must MATCH
                             tail_query_process(
                                 &redis_addr,
                                 &reqid,
-                                &modelname,
+                                &proto_name,
+                                &model_name,
                                 &pair_list.unwrap(),
                             );
                         }
@@ -141,6 +143,7 @@ impl Worker {
                 let redis_addr = std::env::var(REDIS_URL_ENV)?;
                 let pg_addr = std::env::var(DB_URL_ENV)?;
                 let method = Method::Post;
+                let proto_name = msg_obj.proto.to_owned();
                 let path = msg_obj.model.to_owned();
                 let payload: Payload = serde_json::from_slice(&msg_obj.data)?;
                 let reqid = payload.reqid.to_owned();
@@ -158,8 +161,6 @@ impl Worker {
                 ef_req
                     .ext_mut()
                     .insert("nonce".to_string(), ext.nonce.to_string());
-                // encode the vec<u8> as hex string, each byte to 2 bchar. And add randomvec to req.ext
-                //let random_string = hex::encode(&ext.randomvec);
                 // encode the vec<u8> as base58 string, and add random_str to req.ext
                 let random_string = bs58::encode(&ext.randomvec).into_string();
                 ef_req
@@ -176,8 +177,14 @@ impl Worker {
                         println!("Worker::work: in post branch: pair_list: {:?}", pair_list);
 
                         if !pair_list.is_empty() {
-                            let modelname = ef_res.info().model_name.to_owned();
-                            tail_post_process(&redis_addr, &reqid, &modelname, &pair_list);
+                            let model_name = ef_res.info().model_name.to_owned();
+                            tail_post_process(
+                                &redis_addr,
+                                &reqid,
+                                &proto_name,
+                                &model_name,
+                                &pair_list,
+                            );
                         }
                     }
                     Err(err) => {
@@ -286,7 +293,7 @@ impl Worker {
                     _ = redis::set(
                         &redis_addr,
                         &CACHE_STATUS_RESULTS.replace('#', &reqid),
-                        b"false",
+                        b"400",
                     );
                     let data = "check of pair list wrong!";
                     _ = redis::set(
@@ -310,7 +317,8 @@ impl Worker {
 fn tail_query_process(
     redis_addr: &str,
     reqid: &str,
-    modelname: &str,
+    proto_name: &str,
+    model_name: &str,
     pair_list: &Vec<(String, String)>,
 ) {
     let payload = json!({
@@ -319,9 +327,9 @@ fn tail_query_process(
     });
 
     println!("tail_query_process: payload: {:?}", payload);
-    // XXX: here, maybe it's better to put check_pair_list value to action field
     let json_to_send = json!({
-        "model": modelname,
+        "proto": proto_name,
+        "model": model_name,
         "action": "check_pair_list",
         "data": payload.to_string().as_bytes().to_vec(),
         "ext": Vec::<u8>::new(),
@@ -330,7 +338,7 @@ fn tail_query_process(
     // send this to the redis channel to subxt to query rpc
     _ = redis::publish(
         redis_addr,
-        CHANNEL_SPIN2PROXY,
+        CHANNEL_GATE2VIN,
         json_to_send.to_string().as_bytes(),
     );
 }
@@ -338,7 +346,8 @@ fn tail_query_process(
 fn tail_post_process(
     redis_addr: &str,
     reqid: &str,
-    modelname: &str,
+    proto_name: &str,
+    model_name: &str,
     pair_list: &Vec<(String, String)>,
 ) {
     let payload = json!({
@@ -348,7 +357,8 @@ fn tail_post_process(
     println!("tail_post_process: payload: {:?}", payload);
 
     let json_to_send = json!({
-        "model": modelname,
+        "proto": proto_name,
+        "model": model_name,
         "action": "update_index",
         "data": payload.to_string().as_bytes().to_vec(),
         "ext": Vec::<u8>::new(),
@@ -356,7 +366,7 @@ fn tail_post_process(
 
     _ = redis::publish(
         redis_addr,
-        CHANNEL_SPIN2PROXY,
+        CHANNEL_GATE2VIN,
         json_to_send.to_string().as_bytes(),
     );
 }
