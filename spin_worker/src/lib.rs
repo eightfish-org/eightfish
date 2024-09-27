@@ -8,7 +8,7 @@ use serde::Deserialize;
 use serde_json::json;
 use spin_sdk::{
     pg::{self, Decode},
-    redis,
+    redis, variables,
 };
 use std::collections::HashMap;
 
@@ -18,6 +18,13 @@ const TMP_CACHE_RESULTS: &str = "tmp:cache:#";
 const CACHE_STATUS_RESULTS: &str = "cache:status:#";
 const CACHE_RESULTS: &str = "cache:#";
 const CHANNEL_GATE2VIN: &str = "gate2vin";
+const ACTION_NEW_BLOCK_HEIGHT: &str = "block_height";
+const ACTION_UPLOAD_WASM: &str = "upload_wasm";
+const ACTION_UPGRADE_WASM: &str = "upgrade_wasm";
+const ACTION_QUERY: &str = "query";
+const ACTION_POST: &str = "post";
+const ACTION_UPDATE_INDEX: &str = "update_index";
+const ACTION_CHECK_PAIR_LIST: &str = "check_pair_list";
 
 #[derive(Deserialize, Debug)]
 pub struct InputOutputObject {
@@ -55,9 +62,41 @@ impl Worker {
         println!("Worker::work: msg_obj: {:?}", msg_obj);
 
         match &msg_obj.action[..] {
-            "query" => {
+            ACTION_NEW_BLOCK_HEIGHT => {
+                // use msg as a timer, tick on every block height
+                let body: [u8; 8] = msg_obj.data.try_into().unwrap_or([0; 8]);
+                // convert to u64
+                let _block_height = u64::from_be_bytes(body);
+
+                // do something
+                // log::info!("Block height: {block_height}");
+            }
+            ACTION_UPLOAD_WASM => {
+                // do nothing, wasm_worker itself doesn't care about new wasm file uploaded
+            }
+            ACTION_UPGRADE_WASM => {
+                // get proto_id from the spin variables
+                let current_proto_id = variables::get("proto_id")?;
+                let current_wasm_hash = variables::get("wasm_hash")?;
+                let proto_id = msg_obj.proto;
+                // if the upgrade msg is for me, do upgrade
+                if proto_id == current_proto_id {
+                    let wasm_hash = hex::encode(msg_obj.data);
+                    if wasm_hash != current_wasm_hash {
+                        // exit from the wasm process
+                        std::process::exit(0);
+                    }
+                }
+            }
+            ACTION_QUERY => {
                 let redis_addr = std::env::var(REDIS_URL_ENV)?;
+                let redis_conn = redis::Connection::open(&redis_addr)
+                    .expect("error when open redis connection.");
+
                 let pg_addr = std::env::var(DB_URL_ENV)?;
+                let pg_conn =
+                    pg::Connection::open(&pg_addr).expect("error when open pg connection.");
+
                 let method = Method::Get;
                 let proto_name = msg_obj.proto.to_owned();
                 // path info put in the model field from the http_gate
@@ -75,7 +114,7 @@ impl Worker {
                         println!("Worker::work: in query branch: ef_res: {:?}", ef_res);
                         // we check the intermediate result  in the framework internal
                         let pair_list =
-                            inner_stuffs_on_query_result(&redis_addr, &pg_addr, &reqid, &ef_res)
+                            inner_stuffs_on_query_result(&redis_conn, &pg_conn, &reqid, &ef_res)
                                 .unwrap();
                         println!("Worker::work: in query branch: pair_list: {:?}", pair_list);
 
@@ -85,7 +124,7 @@ impl Worker {
                             // but that will force the developer use a strict unified url shcema in his product
                             // the names in query and post must MATCH
                             tail_query_process(
-                                &redis_addr,
+                                &redis_conn,
                                 &reqid,
                                 &proto_name,
                                 &model_name,
@@ -94,54 +133,20 @@ impl Worker {
                         }
                     }
                     Err(err) => {
-                        match err.downcast_ref::<&str>() {
-                            Some(&"404") => {
-                                // write not found msg to cache
-                                _ = redis::set(
-                                    &redis_addr,
-                                    &CACHE_STATUS_RESULTS.replace('#', &reqid),
-                                    b"404",
-                                );
-                                _ = redis::set(
-                                    &redis_addr,
-                                    &CACHE_RESULTS.replace('#', &reqid),
-                                    b"Not Found",
-                                );
-                            }
-                            Some(s) => {
-                                // write not found msg to cache
-                                _ = redis::set(
-                                    &redis_addr,
-                                    &CACHE_STATUS_RESULTS.replace('#', &reqid),
-                                    b"500",
-                                );
-                                _ = redis::set(
-                                    &redis_addr,
-                                    &CACHE_RESULTS.replace('#', &reqid),
-                                    &s.as_bytes(),
-                                );
-                            }
-                            None => {
-                                // write not found msg to cache
-                                _ = redis::set(
-                                    &redis_addr,
-                                    &CACHE_STATUS_RESULTS.replace('#', &reqid),
-                                    b"500",
-                                );
-                                _ = redis::set(
-                                    &redis_addr,
-                                    &CACHE_RESULTS.replace('#', &reqid),
-                                    &format!("{}", err).as_bytes(),
-                                );
-                            }
-                        }
+                        err_process(err, &redis_conn, &reqid);
                         return Err(anyhow!("query error"));
                     }
                 }
             }
-            "post" => {
+            ACTION_POST => {
                 let redis_addr = std::env::var(REDIS_URL_ENV)?;
+                let redis_conn = redis::Connection::open(&redis_addr)
+                    .expect("error when open redis connection.");
+
                 let pg_addr = std::env::var(DB_URL_ENV)?;
+                let pg_conn =
+                    pg::Connection::open(&pg_addr).expect("error when open pg connection.");
+
                 let method = Method::Post;
                 let proto_name = msg_obj.proto.to_owned();
                 let path = msg_obj.model.to_owned();
@@ -172,14 +177,14 @@ impl Worker {
                     Ok(ef_res) => {
                         println!("Worker::work: in post branch: ef_res: {:?}", ef_res);
                         let pair_list =
-                            inner_stuffs_on_post_result(&redis_addr, &pg_addr, &reqid, &ef_res)
+                            inner_stuffs_on_post_result(&redis_conn, &pg_conn, &reqid, &ef_res)
                                 .unwrap();
                         println!("Worker::work: in post branch: pair_list: {:?}", pair_list);
 
                         if !pair_list.is_empty() {
                             let model_name = ef_res.info().model_name.to_owned();
                             tail_post_process(
-                                &redis_addr,
+                                &redis_conn,
                                 &reqid,
                                 &proto_name,
                                 &model_name,
@@ -188,52 +193,13 @@ impl Worker {
                         }
                     }
                     Err(err) => {
-                        match err.downcast_ref::<&str>() {
-                            Some(&"404") => {
-                                // write not found msg to cache
-                                _ = redis::set(
-                                    &redis_addr,
-                                    &CACHE_STATUS_RESULTS.replace('#', &reqid),
-                                    b"404",
-                                );
-                                _ = redis::set(
-                                    &redis_addr,
-                                    &CACHE_RESULTS.replace('#', &reqid),
-                                    b"Not Found",
-                                );
-                            }
-                            Some(s) => {
-                                // write not found msg to cache
-                                _ = redis::set(
-                                    &redis_addr,
-                                    &CACHE_STATUS_RESULTS.replace('#', &reqid),
-                                    b"500",
-                                );
-                                _ = redis::set(
-                                    &redis_addr,
-                                    &CACHE_RESULTS.replace('#', &reqid),
-                                    &s.as_bytes(),
-                                );
-                            }
-                            None => {
-                                // write not found msg to cache
-                                _ = redis::set(
-                                    &redis_addr,
-                                    &CACHE_STATUS_RESULTS.replace('#', &reqid),
-                                    b"500",
-                                );
-                                _ = redis::set(
-                                    &redis_addr,
-                                    &CACHE_RESULTS.replace('#', &reqid),
-                                    &format!("{}", err).as_bytes(),
-                                );
-                            }
-                        }
+                        err_process(err, &redis_conn, &reqid);
                         return Err(anyhow!("post error"));
                     }
                 }
             }
-            "update_index" => {
+
+            ACTION_UPDATE_INDEX => {
                 // Callback: handle the result of the update_index call event
                 // the format of the msg_obj.data is: reqid:id:hash
                 // and msg.model is model, msg.action is action
@@ -255,20 +221,25 @@ impl Worker {
                 // while getting the index updated callback, we put result http_gate wants into redis
                 // cache
                 let redis_addr = std::env::var(REDIS_URL_ENV)?;
+                let redis_conn = redis::Connection::open(&redis_addr)
+                    .expect("error when open redis connection.");
+
                 let cache_key = CACHE_STATUS_RESULTS.replace('#', &reqid);
-                _ = redis::set(&redis_addr, &cache_key, b"200");
+                _ = redis_conn.set(&cache_key, &b"200".to_vec());
 
                 // in previous post process, we have set the TMP_CACHE_RESULTS
-                let tmpdata = redis::get(&redis_addr, &TMP_CACHE_RESULTS.replace('#', &reqid));
-                if let Ok(tmpdata) = tmpdata {
+                let tmpdata = redis_conn.get(&TMP_CACHE_RESULTS.replace('#', &reqid));
+                if let Ok(Some(tmpdata)) = tmpdata {
                     // set to CACHE_RESULTS
-                    let _ = redis::set(&redis_addr, &CACHE_RESULTS.replace('#', &reqid), &tmpdata);
+                    let _ = redis_conn.set(&CACHE_RESULTS.replace('#', &reqid), &tmpdata);
                 }
                 // delete the tmp cache
-                _ = redis::del(&redis_addr, &[&TMP_CACHE_RESULTS.replace('#', &reqid)]);
+                _ = redis_conn.del(&[TMP_CACHE_RESULTS.replace('#', &reqid)]);
             }
-            "check_pair_list" => {
+            ACTION_CHECK_PAIR_LIST => {
                 let redis_addr = std::env::var(REDIS_URL_ENV)?;
+                let redis_conn = redis::Connection::open(&redis_addr)
+                    .expect("error when open redis connection.");
 
                 // handle the result of the check_pair_list
                 let payload: Payload = serde_json::from_slice(&msg_obj.data)?;
@@ -277,32 +248,24 @@ impl Worker {
 
                 if &reqdata == "true" {
                     // check pass, get content from the tmp cache and write this content to a cache
-                    let tmpdata = redis::get(&redis_addr, &TMP_CACHE_RESULTS.replace('#', &reqid));
-                    _ = redis::set(
-                        &redis_addr,
-                        &CACHE_STATUS_RESULTS.replace('#', &reqid),
-                        b"200",
-                    );
-                    if let Ok(tmpdata) = tmpdata {
-                        let _ =
-                            redis::set(&redis_addr, &CACHE_RESULTS.replace('#', &reqid), &tmpdata);
+                    let tmpdata = redis_conn.get(&TMP_CACHE_RESULTS.replace('#', &reqid));
+                    _ = redis_conn
+                        .set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"200".to_vec());
+                    if let Ok(Some(tmpdata)) = tmpdata {
+                        let _ = redis_conn.set(&CACHE_RESULTS.replace('#', &reqid), &tmpdata);
                     }
                     // delete the tmp cache
-                    _ = redis::del(&redis_addr, &[&TMP_CACHE_RESULTS.replace('#', &reqid)]);
+                    _ = redis_conn.del(&[TMP_CACHE_RESULTS.replace('#', &reqid)]);
                 } else {
-                    _ = redis::set(
-                        &redis_addr,
-                        &CACHE_STATUS_RESULTS.replace('#', &reqid),
-                        b"400",
-                    );
+                    _ = redis_conn
+                        .set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"400".to_vec());
                     let data = "check of pair list wrong!";
-                    _ = redis::set(
-                        &redis_addr,
+                    _ = redis_conn.set(
                         &CACHE_RESULTS.replace('#', &reqid),
-                        data.as_bytes(),
+                        &data.as_bytes().to_vec(),
                     );
                     // clear another tmp cache key
-                    _ = redis::del(&redis_addr, &[&TMP_CACHE_RESULTS.replace('#', &reqid)]);
+                    _ = redis_conn.del(&[TMP_CACHE_RESULTS.replace('#', &reqid)]);
                 }
             }
             &_ => {
@@ -315,7 +278,7 @@ impl Worker {
 }
 
 fn tail_query_process(
-    redis_addr: &str,
+    redis_conn: &redis::Connection,
     reqid: &str,
     proto_name: &str,
     model_name: &str,
@@ -336,15 +299,14 @@ fn tail_query_process(
     });
 
     // send this to the redis channel to subxt to query rpc
-    _ = redis::publish(
-        redis_addr,
+    _ = redis_conn.publish(
         CHANNEL_GATE2VIN,
-        json_to_send.to_string().as_bytes(),
+        &json_to_send.to_string().as_bytes().to_vec(),
     );
 }
 
 fn tail_post_process(
-    redis_addr: &str,
+    redis_conn: &redis::Connection,
     reqid: &str,
     proto_name: &str,
     model_name: &str,
@@ -364,16 +326,15 @@ fn tail_post_process(
         "ext": Vec::<u8>::new(),
     });
 
-    _ = redis::publish(
-        redis_addr,
+    _ = redis_conn.publish(
         CHANNEL_GATE2VIN,
-        json_to_send.to_string().as_bytes(),
+        &json_to_send.to_string().as_bytes().to_vec(),
     );
 }
 
 fn inner_stuffs_on_query_result(
-    redis_addr: &str,
-    pg_addr: &str,
+    redis_conn: &redis::Connection,
+    pg_conn: &pg::Connection,
     reqid: &str,
     res: &EightFishResponse,
 ) -> Result<Option<Vec<(String, String)>>> {
@@ -390,7 +351,7 @@ fn inner_stuffs_on_query_result(
         let query_string =
             format!("select id, hash from {table_name}_idhash where id in ({ids_string})");
         println!("query_string: {:?}", query_string);
-        let rowset = pg::query(&pg_addr, &query_string, &[]).unwrap();
+        let rowset = pg_conn.query(&query_string, &[]).unwrap();
 
         let mut idhash_map: HashMap<String, String> = HashMap::new();
         for row in rowset.rows {
@@ -412,24 +373,18 @@ fn inner_stuffs_on_query_result(
         println!("res.results: {:?}", res.results());
         // store to cache for http gate to retrieve
         let data_to_cache = res.results().clone().unwrap_or("".to_string());
-        _ = redis::set(
-            &redis_addr,
+        _ = redis_conn.set(
             &TMP_CACHE_RESULTS.replace('#', reqid),
-            data_to_cache.as_bytes(),
+            &data_to_cache.as_bytes().to_vec(),
         );
 
         Ok(Some(pair_list.to_vec()))
     } else {
         let data_to_cache = res.results().clone().unwrap_or("[]".to_string());
-        _ = redis::set(
-            &redis_addr,
-            &CACHE_STATUS_RESULTS.replace('#', &reqid),
-            b"200",
-        );
-        _ = redis::set(
-            &redis_addr,
+        _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"200".to_vec());
+        _ = redis_conn.set(
             &CACHE_RESULTS.replace('#', &reqid),
-            &data_to_cache.as_bytes(),
+            &data_to_cache.as_bytes().to_vec(),
         );
 
         Ok(None)
@@ -437,8 +392,8 @@ fn inner_stuffs_on_query_result(
 }
 
 fn inner_stuffs_on_post_result(
-    redis_addr: &str,
-    pg_addr: &str,
+    redis_conn: &redis::Connection,
+    pg_conn: &pg::Connection,
     reqid: &str,
     res: &EightFishResponse,
 ) -> Result<Vec<(String, String)>> {
@@ -454,15 +409,10 @@ fn inner_stuffs_on_post_result(
         ins_hash = pair.1.clone();
     } else {
         let data_to_cache = "[]".to_string();
-        _ = redis::set(
-            &redis_addr,
-            &CACHE_STATUS_RESULTS.replace('#', &reqid),
-            b"200",
-        );
-        _ = redis::set(
-            &redis_addr,
+        _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"200".to_vec());
+        _ = redis_conn.set(
             &CACHE_RESULTS.replace('#', &reqid),
-            &data_to_cache.as_bytes(),
+            &data_to_cache.as_bytes().to_vec(),
         );
 
         return Ok(vec![]);
@@ -474,7 +424,7 @@ fn inner_stuffs_on_post_result(
                 "insert into {table_name}_idhash values ('{}', '{}')",
                 id, ins_hash
             );
-            let _execute_results = pg::execute(&pg_addr, &sql_string, &[]);
+            let _execute_results = pg_conn.execute(&sql_string, &[]);
             // TODO: check the pg result
             println!(
                 "in post stuff: new: _execute_results: {:?}",
@@ -484,7 +434,7 @@ fn inner_stuffs_on_post_result(
         HandlerCRUD::Update => {
             let sql_string =
                 format!("update {table_name}_idhash set hash='{ins_hash}' where id='{id}'");
-            let _execute_results = pg::execute(&pg_addr, &sql_string, &[]);
+            let _execute_results = pg_conn.execute(&sql_string, &[]);
             println!(
                 "in post stuff: update: _execute_results: {:?}",
                 _execute_results
@@ -492,7 +442,7 @@ fn inner_stuffs_on_post_result(
         }
         HandlerCRUD::Delete => {
             let sql_string = format!("delete {table_name}_idhash where id='{id}'");
-            let _execute_results = pg::execute(&pg_addr, &sql_string, &[]);
+            let _execute_results = pg_conn.execute(&sql_string, &[]);
             // TODO: check the pg result
             println!(
                 "in post stuff: delete: _execute_results: {:?}",
@@ -504,13 +454,35 @@ fn inner_stuffs_on_post_result(
 
     // write response to tmp cache
     let data_to_cache = res.results().to_owned().unwrap_or("".to_string());
-    _ = redis::set(
-        &redis_addr,
+    _ = redis_conn.set(
         &TMP_CACHE_RESULTS.replace('#', reqid),
-        data_to_cache.as_bytes(),
+        &data_to_cache.as_bytes().to_vec(),
     );
 
     let pair_list: Vec<(String, String)> = vec![(id, ins_hash)];
 
     Ok(pair_list)
+}
+
+fn err_process(err: anyhow::Error, redis_conn: &redis::Connection, reqid: &str) {
+    match err.downcast_ref::<&str>() {
+        Some(&"404") => {
+            // write not found msg to cache
+            _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"404".to_vec());
+            _ = redis_conn.set(&CACHE_RESULTS.replace('#', &reqid), &b"Not Found".to_vec());
+        }
+        Some(s) => {
+            // write not found msg to cache
+            _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"500".to_vec());
+            _ = redis_conn.set(&CACHE_RESULTS.replace('#', &reqid), &s.as_bytes().to_vec());
+        }
+        None => {
+            // write not found msg to cache
+            _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"500".to_vec());
+            _ = redis_conn.set(
+                &CACHE_RESULTS.replace('#', &reqid),
+                &format!("{}", err).as_bytes().to_vec(),
+            );
+        }
+    }
 }
