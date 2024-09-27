@@ -14,5 +14,5 @@ json-digest = "0.0.16"
 hex = "0.4.3"
 bs58 = "0.4.0"
 
-eightfish = {path="../"}
+eightfish-sdk = {path="../sdk"}
 

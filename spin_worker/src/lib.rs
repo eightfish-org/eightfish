@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use bytes::Bytes;
-use eightfish::{
+use eightfish_sdk::{
     App as EightFishApp, Handler, HandlerCRUD, Method, Request as EightFishRequest,
     Response as EightFishResponse,
 };
