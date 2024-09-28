@@ -59,7 +59,7 @@ impl Worker {
 
     pub fn work(self, message: Bytes) -> Result<()> {
         let msg_obj: InputOutputObject = serde_json::from_slice(&message)?;
-        println!("Worker::work: msg_obj: {:?}", msg_obj);
+        // println!("Worker::work: msg_obj: {:?}", msg_obj);
 
         match &msg_obj.action[..] {
             ACTION_NEW_BLOCK_HEIGHT => {
@@ -81,15 +81,16 @@ impl Worker {
                 println!(
                     "current proto_id: {current_proto_id}, current wasm_hash: {current_wasm_hash}"
                 );
-                let proto_id = msg_obj.proto;
-                // if the upgrade msg is for me, do upgrade
-                if proto_id == current_proto_id {
-                    let wasm_hash = hex::encode(msg_obj.data);
-                    if wasm_hash != current_wasm_hash {
-                        // exit from the wasm process
-                        std::process::exit(0);
-                    }
-                }
+                // let proto_id = msg_obj.proto;
+                // // if the upgrade msg is for me, do upgrade
+                // if proto_id == current_proto_id {
+                //     let wasm_hash = hex::encode(msg_obj.data);
+                //     if wasm_hash != current_wasm_hash {
+                //         println!("== ready to exit. ==");
+                //         // exit from the wasm process
+                //         std::process::exit(0);
+                //     }
+                // }
             }
             ACTION_QUERY => {
                 let redis_addr = std::env::var(REDIS_URL_ENV)?;
