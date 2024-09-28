@@ -1,5 +1,5 @@
-use eightfish::EightFishModel;
 use eightfish_derive::EightFishModel;
+use eightfish_sdk::EightFishModel;
 use serde::{Deserialize, Serialize};
 use spin_sdk::pg::{DbValue, Decode, ParameterValue};
 #[derive(Default, EightFishModel, PartialEq, Debug, Serialize, Deserialize)]

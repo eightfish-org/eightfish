@@ -78,6 +78,9 @@ impl Worker {
                 // get proto_id from the spin variables
                 let current_proto_id = variables::get("proto_id")?;
                 let current_wasm_hash = variables::get("wasm_hash")?;
+                log::info!(
+                    "current proto_id: {current_proto_id}, current wasm_hash: {current_wasm_hash}"
+                );
                 let proto_id = msg_obj.proto;
                 // if the upgrade msg is for me, do upgrade
                 if proto_id == current_proto_id {
