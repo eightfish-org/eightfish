@@ -230,14 +230,15 @@ impl Worker {
                 let redis_conn = redis::Connection::open(&redis_addr)
                     .expect("error when open redis connection.");
 
-                let cache_key = CACHE_STATUS_RESULTS.replace('#', &reqid);
-                _ = redis_conn.set(&cache_key, &b"200".to_vec());
-
                 // in previous post process, we have set the TMP_CACHE_RESULTS
                 let tmpdata = redis_conn.get(&TMP_CACHE_RESULTS.replace('#', &reqid));
+                println!("callback: update_index: tmpdata: {:?}", tmpdata);
                 if let Ok(Some(tmpdata)) = tmpdata {
                     // set to CACHE_RESULTS
                     let _ = redis_conn.set(&CACHE_RESULTS.replace('#', &reqid), &tmpdata);
+                    // put status results behind to avoid the atomic result retrieving problem
+                    let cache_key = CACHE_STATUS_RESULTS.replace('#', &reqid);
+                    _ = redis_conn.set(&cache_key, &b"200".to_vec());
                 }
                 // delete the tmp cache
                 _ = redis_conn.del(&[TMP_CACHE_RESULTS.replace('#', &reqid)]);
@@ -255,22 +256,24 @@ impl Worker {
                 if &reqdata == "true" {
                     // check pass, get content from the tmp cache and write this content to a cache
                     let tmpdata = redis_conn.get(&TMP_CACHE_RESULTS.replace('#', &reqid));
-                    _ = redis_conn
-                        .set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"200".to_vec());
                     if let Ok(Some(tmpdata)) = tmpdata {
                         let _ = redis_conn.set(&CACHE_RESULTS.replace('#', &reqid), &tmpdata);
+                        // put status results behind to avoid the atomic result retrieving problem
+                        _ = redis_conn
+                            .set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"200".to_vec());
                     }
                     // delete the tmp cache
                     _ = redis_conn.del(&[TMP_CACHE_RESULTS.replace('#', &reqid)]);
                 } else {
-                    _ = redis_conn
-                        .set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"400".to_vec());
                     let data = "check of pair list wrong!";
                     _ = redis_conn.set(
                         &CACHE_RESULTS.replace('#', &reqid),
                         &data.as_bytes().to_vec(),
                     );
-                    // clear another tmp cache key
+                    // put status results behind to avoid the atomic result retrieving problem
+                    _ = redis_conn
+                        .set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"400".to_vec());
+                    // clear left tmp cache key
                     _ = redis_conn.del(&[TMP_CACHE_RESULTS.replace('#', &reqid)]);
                 }
             }
@@ -387,11 +390,11 @@ fn inner_stuffs_on_query_result(
         Ok(Some(pair_list.to_vec()))
     } else {
         let data_to_cache = res.results().clone().unwrap_or("[]".to_string());
-        _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"200".to_vec());
         _ = redis_conn.set(
             &CACHE_RESULTS.replace('#', &reqid),
             &data_to_cache.as_bytes().to_vec(),
         );
+        _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"200".to_vec());
 
         Ok(None)
     }
@@ -415,11 +418,11 @@ fn inner_stuffs_on_post_result(
         ins_hash = pair.1.clone();
     } else {
         let data_to_cache = "[]".to_string();
-        _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"200".to_vec());
         _ = redis_conn.set(
             &CACHE_RESULTS.replace('#', &reqid),
             &data_to_cache.as_bytes().to_vec(),
         );
+        _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"200".to_vec());
 
         return Ok(vec![]);
     }
@@ -460,6 +463,14 @@ fn inner_stuffs_on_post_result(
 
     // write response to tmp cache
     let data_to_cache = res.results().to_owned().unwrap_or("".to_string());
+    println!(
+        "in inner_stuffs_on_post_result, res.results(): {:?}",
+        res.results()
+    );
+    println!(
+        "in inner_stuffs_on_post_result, to tmp cache: {}",
+        data_to_cache
+    );
     _ = redis_conn.set(
         &TMP_CACHE_RESULTS.replace('#', reqid),
         &data_to_cache.as_bytes().to_vec(),
@@ -474,21 +485,21 @@ fn err_process(err: anyhow::Error, redis_conn: &redis::Connection, reqid: &str) 
     match err.downcast_ref::<&str>() {
         Some(&"404") => {
             // write not found msg to cache
-            _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"404".to_vec());
             _ = redis_conn.set(&CACHE_RESULTS.replace('#', &reqid), &b"Not Found".to_vec());
+            _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"404".to_vec());
         }
         Some(s) => {
             // write not found msg to cache
-            _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"500".to_vec());
             _ = redis_conn.set(&CACHE_RESULTS.replace('#', &reqid), &s.as_bytes().to_vec());
+            _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"500".to_vec());
         }
         None => {
             // write not found msg to cache
-            _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"500".to_vec());
             _ = redis_conn.set(
                 &CACHE_RESULTS.replace('#', &reqid),
                 &format!("{}", err).as_bytes().to_vec(),
             );
+            _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"500".to_vec());
         }
     }
 }
