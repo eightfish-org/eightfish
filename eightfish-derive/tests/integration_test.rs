@@ -90,9 +90,9 @@ fn test_build_insert_param_mix_type() {
         like: 100,
     };
     let params = f.params_insert();
-    assert!(matches!(params[0], ParameterValue::Str(_id)));
-    assert!(matches!(params[2], ParameterValue::Boolean(true)));
-    assert!(matches!(params[3], ParameterValue::Int64(100)));
+    assert!(matches!(&params[0], ParameterValue::Str(_id)));
+    assert!(matches!(&params[2], ParameterValue::Boolean(true)));
+    assert!(matches!(&params[3], ParameterValue::Int64(100)));
 }
 
 #[test]
@@ -106,9 +106,9 @@ fn test_build_update_param() {
         content: content.to_string(),
     };
     let params = f.params_update();
-    assert!(matches!(params[0], ParameterValue::Str(_id)));
-    assert!(matches!(params[1], ParameterValue::Str(_title)));
-    assert!(matches!(params[2], ParameterValue::Str(_content)));
+    assert!(matches!(&params[0], ParameterValue::Str(_id)));
+    assert!(matches!(&params[1], ParameterValue::Str(_title)));
+    assert!(matches!(&params[2], ParameterValue::Str(_content)));
 }
 #[test]
 fn test_build_insert_sql_and_params() {
@@ -125,9 +125,9 @@ fn test_build_insert_sql_and_params() {
         "INSERT INTO foo (id, title, content) VALUES ($1, $2, $3);",
         statement
     );
-    assert!(matches!(params[0], ParameterValue::Str(_id)));
-    assert!(matches!(params[1], ParameterValue::Str(_title)));
-    assert!(matches!(params[2], ParameterValue::Str(_content)));
+    assert!(matches!(&params[0], ParameterValue::Str(_id)));
+    assert!(matches!(&params[1], ParameterValue::Str(_title)));
+    assert!(matches!(&params[2], ParameterValue::Str(_content)));
 }
 
 #[test]
@@ -146,9 +146,9 @@ fn test_build_update_sql_and_params() {
         "UPDATE foo SET id = $1, title = $2, content = $3 WHERE id = $1;",
         statement
     );
-    assert!(matches!(params[0], ParameterValue::Str(_id)));
-    assert!(matches!(params[1], ParameterValue::Str(_title)));
-    assert!(matches!(params[2], ParameterValue::Str(_content)));
+    assert!(matches!(&params[0], ParameterValue::Str(_id)));
+    assert!(matches!(&params[1], ParameterValue::Str(_title)));
+    assert!(matches!(&params[2], ParameterValue::Str(_content)));
 }
 
 #[test]
@@ -160,7 +160,7 @@ fn test_build_get_one_sql_and_params() {
         "SELECT id, title, content FROM foo WHERE id = $1;",
         statement
     );
-    assert!(matches!(params[0], ParameterValue::Str(_id)));
+    assert!(matches!(&params[0], ParameterValue::Str(_id)));
 }
 
 #[test]
@@ -169,7 +169,7 @@ fn test_build_delete_sql_and_params() {
     let (statement, params) = Foo::build_delete(id);
 
     assert_eq!("DELETE FROM foo WHERE id = $1;", statement);
-    assert!(matches!(params[0], ParameterValue::Str(_id)));
+    assert!(matches!(&params[0], ParameterValue::Str(_id)));
 }
 
 #[test]
