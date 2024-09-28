@@ -15,5 +15,4 @@ hex = "0.4.3"
 bs58 = "0.4.0"
 
 eightfish-sdk = {path="../sdk"}
-log = "0.4.22"
 

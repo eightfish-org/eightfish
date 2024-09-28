@@ -69,7 +69,7 @@ impl Worker {
                 let _block_height = u64::from_be_bytes(body);
 
                 // do something
-                // log::info!("Block height: {block_height}");
+                // println!("Block height: {block_height}");
             }
             ACTION_UPLOAD_WASM => {
                 // do nothing, wasm_worker itself doesn't care about new wasm file uploaded
@@ -78,7 +78,7 @@ impl Worker {
                 // get proto_id from the spin variables
                 let current_proto_id = variables::get("proto_id")?;
                 let current_wasm_hash = variables::get("wasm_hash")?;
-                log::info!(
+                println!(
                     "current proto_id: {current_proto_id}, current wasm_hash: {current_wasm_hash}"
                 );
                 let proto_id = msg_obj.proto;
@@ -143,10 +143,12 @@ impl Worker {
             }
             ACTION_POST => {
                 let redis_addr = std::env::var(REDIS_URL_ENV)?;
+                println!("redis_addr: {}", redis_addr);
                 let redis_conn = redis::Connection::open(&redis_addr)
                     .expect("error when open redis connection.");
 
                 let pg_addr = std::env::var(DB_URL_ENV)?;
+                println!("pg_addr: {}", pg_addr);
                 let pg_conn =
                     pg::Connection::open(&pg_addr).expect("error when open pg connection.");
 
