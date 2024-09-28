@@ -90,7 +90,7 @@ fn test_build_insert_param_mix_type() {
         like: 100,
     };
     let params = f.params_insert();
-    assert!(matches!(params[0], ParameterValue::Str("id")));
+    assert!(matches!(params[0], ParameterValue::Str(_id)));
     assert!(matches!(params[2], ParameterValue::Boolean(true)));
     assert!(matches!(params[3], ParameterValue::Int64(100)));
 }
