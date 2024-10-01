@@ -61,7 +61,7 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
                 if type_path.clone().into_token_stream().to_string() == "String" =>
             {
                 quote! {
-                    param_vec.push(ParameterValue::Str(self.#field_name.as_str()));
+                    param_vec.push(ParameterValue::Str(self.#field_name.to_string()));
                 }
             }
             Type::Path(type_path) if type_path.clone().into_token_stream().to_string() == "i64" => {
@@ -127,7 +127,7 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
             /// build the parameters for the sql statement to get a record with id
             pub fn params_get_by_id(value: &str) -> Vec<ParameterValue> {
                 let mut param_vec: Vec<ParameterValue> = Vec::new();
-                param_vec.push(ParameterValue::Str(value));
+                param_vec.push(ParameterValue::Str(value.to_string()));
                 param_vec
             }
             /// build both the sql statement and parameters to get a record with id
@@ -179,7 +179,7 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
             /// build the parameters for the sql statement to delete the record
             pub fn params_delete(id: &str) -> Vec<ParameterValue> {
                 let mut param_vec: Vec<ParameterValue> = Vec::new();
-                param_vec.push(ParameterValue::Str(id));
+                param_vec.push(ParameterValue::Str(id.to_string()));
                 param_vec
             }
             /// build both the sql statement and parameters to delete a record with given id
