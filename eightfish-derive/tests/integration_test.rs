@@ -1,7 +1,8 @@
-use eightfish_derive::EightFishModel;
+use eightfish_derive::{EightFishModel, EightFishDTO, dtocore};
 use eightfish_sdk::EightFishModel;
 use serde::{Deserialize, Serialize};
 use spin_sdk::pg::{DbValue, Decode, ParameterValue};
+
 #[derive(Default, EightFishModel, PartialEq, Debug, Serialize, Deserialize)]
 struct Foo {
     id: String,
@@ -233,3 +234,57 @@ fn test_build_struct_from_row() {
     ];
     assert_eq!(expected, Foo::from_row(row));
 }
+
+
+#[derive(Default, EightFishModel, PartialEq, Debug, Serialize, Deserialize)]
+struct StructInner {
+    id: String, // it's must
+    a: String,
+    b: String,
+}
+
+#[derive(EightFishDTO, Debug)]
+struct StructDTO {
+    #[dtocore]
+    inner: StructInner,
+    other: String,
+}
+
+#[test]
+fn test_ef_dto() {
+    let row = vec![DbValue::Str("xxuuid".to_string()), DbValue::Str("1".to_string()), DbValue::Str("test".to_string()), DbValue::Str("extra".to_string())];
+    let dto = StructDTO::from_row(row);
+    println!("{:?}", dto);
+    
+    assert_eq!(dto.inner.id, "xxuuid");
+    assert_eq!(dto.inner.a, "1");
+    assert_eq!(dto.inner.b, "test");
+    assert_eq!(dto.other, "extra");
+}
+
+#[derive(Default, EightFishModel, PartialEq, Debug, Serialize, Deserialize)]
+struct Inner0 {
+    id: String,  // it's must
+    a: i32,
+    b: String,
+}
+
+#[derive(EightFishDTO, Debug)]
+struct DTO00 {
+    #[dtocore]
+    inner: Inner0,
+    other: String,
+}
+
+#[test]
+fn test_ef_dto_2() {
+    let row = vec![DbValue::Str("xxuuid".to_string()), DbValue::Int32(1), DbValue::Str("test".to_string()), DbValue::Str("extra".to_string())];
+    let dto = DTO00::from_row(row);
+    println!("{:?}", dto);
+    
+    assert_eq!(dto.inner.id, "xxuuid");
+    assert_eq!(dto.inner.a, 1);
+    assert_eq!(dto.inner.b, "test");
+    assert_eq!(dto.other, "extra");
+}
+

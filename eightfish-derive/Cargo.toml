@@ -10,11 +10,13 @@ proc-macro = true
 [dependencies]
 proc-macro2 = "1.0"
 quote = "1.0"
-syn = { version = "1.0", features = ["full"] }
+syn = { version = "2.0", features = ["full", "visit"] }
 serde = { version = '1.0', default-features = false, features = ['derive'] }
 serde_json = { version = '1.0', default-features = false, features = ['alloc'] }
 json-digest = "0.0.16"
 sql-builder = "3.1"
+walkdir = "2.5.0"
+cargo_metadata = "0.19.1"
 
 [dev-dependencies]
 eightfish-sdk = {path = "../sdk"}

@@ -9,10 +9,6 @@
 //!ParameterValue::Int16(v)
 //!ParameterValue::Floating32(v)
 //!ParameterValue::Floating64(v)
-//!ParameterValue::Uint8(v)
-//!ParameterValue::Uint16(v)
-//!ParameterValue::Uint32(v)
-//!ParameterValue::Uint64(v)
 //!ParameterValue::Str(v)
 //!ParameterValue::Binary(v)
 //!ParameterValue::DbNull
@@ -203,3 +199,4 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
 
     output
 }
+
