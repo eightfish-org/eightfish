@@ -151,6 +151,8 @@ pub fn eight_fish_dto_derive(input: TokenStream) -> TokenStream {
             let all_field_types = vec![core_field_types.clone(), other_field_types.clone()].concat();
             let orders = all_field_idents.iter().enumerate().map(|(i, _)| i).collect::<Vec<_>>();
 
+            let core_type_name = type_to_string(core_field_type);
+
             quote! {
                 #[derive(Debug, Clone, Default)]
                 pub struct #flattened_name {
@@ -181,8 +183,9 @@ pub fn eight_fish_dto_derive(input: TokenStream) -> TokenStream {
                 }
 
                 impl EightFishModel for #name {
-                    fn model_name(&self) -> String {
-                        self.#core_field_name.model_name()
+                    /// get the model name of the core type
+                    fn model_name() -> String {
+                        #core_type_name.to_string()
                     }
                     /// get the id of the model object
                     fn id(&self) -> String {
@@ -196,18 +199,35 @@ pub fn eight_fish_dto_derive(input: TokenStream) -> TokenStream {
                     }
                 }
 
-                impl From<#core_field_type> for #flattened_name {
-                    fn from(core: #core_field_type) -> Self {
-                        Self {
-                            #(#core_field_idents: core.#core_field_idents,)*
-                            #(#other_field_idents: Default::default(),)*
-                        }
-                    }
-                }
+                // impl From<#core_field_type> for #flattened_name {
+                //     fn from(core: #core_field_type) -> Self {
+                //         Self {
+                //             #(#core_field_idents: core.#core_field_idents,)*
+                //             #(#other_field_idents: Default::default(),)*
+                //         }
+                //     }
+                // }
             }
         },
         _ => panic!("EightFishDTO only supports structs"),
     };
 
     TokenStream::from(expanded)
+}
+
+
+fn type_to_string(ty: &Type) -> String {
+    match ty {
+        Type::Path(type_path) => {
+            // Extract the path segments and join them (e.g., `std::vec::Vec` -> "Vec")
+            type_path
+                .path
+                .segments
+                .iter()
+                .map(|segment| segment.ident.to_string())
+                .collect::<Vec<_>>()
+                .join("::")
+        }
+        _ => "Unknown".to_string(), // Handle other types (e.g., references, tuples)
+    }
 }

@@ -1,23 +1,15 @@
-use crate::HandlerCRUD;
 use serde::Serialize;
+use crate::request::Method;
 
 /// Response status
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Copy)]
 pub enum Status {
     Successful,
     Failed,
 }
 
-/// Response info
-#[derive(Default, Debug)]
-pub struct Info {
-    pub model_name: String,
-    pub action: HandlerCRUD,
-    pub extra: String,
-}
-
 pub trait EightFishModel: Serialize {
-    fn model_name(&self) -> String;
+    fn model_name() -> String;
     fn id(&self) -> String;
     fn calc_hash(&self) -> String;
 }
@@ -25,9 +17,10 @@ pub trait EightFishModel: Serialize {
 #[derive(Debug)]
 pub struct EightFishResponse {
     status: Status,
-    info: Info,
+    method: Method,
+    model_name: String,
     pair_list: Option<Vec<(String, String)>>,
-    results: Option<String>,
+    result: Option<String>,
 }
 
 fn do_serialization<T: Serialize>(results: Vec<T>) -> String {
@@ -37,45 +30,48 @@ fn do_serialization<T: Serialize>(results: Vec<T>) -> String {
 impl EightFishResponse {
     pub fn new<T: Serialize + EightFishModel>(
         status: Status,
-        info: Info,
-        aresults: Vec<T>,
+        method: Method,
+        results: Vec<T>,
     ) -> EightFishResponse {
+        let model_name = T::model_name();
         let pair_list;
-        let results;
+        let result;
 
-        if aresults.is_empty() {
+        if results.is_empty() {
             pair_list = None;
-            results = None;
+            result = None;
         } else {
-            let a_pair_list = aresults
+            let a_pair_list = results
                 .iter()
                 .map(|obj| (obj.id(), obj.calc_hash()))
                 .collect();
             pair_list = Some(a_pair_list);
-            let output = do_serialization(aresults);
-            results = Some(output);
+            let output = do_serialization(results);
+            result = Some(output);
         }
 
         EightFishResponse {
             status,
-            info,
+            method,
+            model_name,
             pair_list,
-            results,
+            result,
         }
     }
 
-    pub fn from_str(status: Status, info: Info, aresults: String) -> EightFishResponse {
+    pub fn from_str(status: Status, method: Method, results: String) -> EightFishResponse {
         EightFishResponse {
             status,
-            info,
+            method,
+            model_name: "".to_string(),
             pair_list: None,
-            results: Some(aresults),
+            result: Some(results),
         }
     }
 
     /// get response status
     pub fn status(&self) -> Status {
-        self.status.clone()
+        self.status
     }
 
     /// set response status
@@ -83,14 +79,9 @@ impl EightFishResponse {
         self.status = status;
     }
 
-    /// get response info
-    pub fn info(&self) -> &Info {
-        &self.info
-    }
-
-    /// set response info
-    pub fn set_info(&mut self, info: Info) {
-        self.info = info;
+    /// get response model_name field
+    pub fn model_name(&self) -> &str {
+        &self.model_name
     }
 
     /// get response pair_list
@@ -98,13 +89,13 @@ impl EightFishResponse {
         &self.pair_list
     }
 
-    /// get response results
-    pub fn results(&self) -> &Option<String> {
-        &self.results
+    /// get response result
+    pub fn result(&self) -> &Option<String> {
+        &self.result
     }
 
-    /// set results
-    pub fn set_results(&mut self, results: Option<String>) {
-        self.results = results;
+    /// set result
+    pub fn set_result(&mut self, result: Option<String>) {
+        self.result = result;
     }
 }

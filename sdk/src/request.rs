@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 
-#[derive(Eq, Hash, PartialEq, Clone)]
+#[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
 pub enum Method {
     Get,
     Post,
+    Put,
+    Delete
 }
 
 //#[derive(Debug)]
@@ -26,7 +28,7 @@ impl EightFishRequest {
 
     /// get http method
     pub fn method(&self) -> Method {
-        self.method.clone()
+        self.method
     }
 
     /// get http path
