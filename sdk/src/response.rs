@@ -17,6 +17,7 @@ pub struct Info {
 }
 
 pub trait EightFishModel: Serialize {
+    fn model_name(&self) -> String;
     fn id(&self) -> String;
     fn calc_hash(&self) -> String;
 }

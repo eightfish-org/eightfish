@@ -158,7 +158,7 @@ pub fn eight_fish_dto_derive(input: TokenStream) -> TokenStream {
                     #(pub #other_field_idents: #other_field_types,)*
                 }
 
-                impl #name {
+                impl #name {                    
                     /// build a object of the struct from a row of database
                     pub fn from_row(row: Vec<DbValue>) -> #name {
                         let mut flattened = #flattened_name::default();
@@ -181,6 +181,9 @@ pub fn eight_fish_dto_derive(input: TokenStream) -> TokenStream {
                 }
 
                 impl EightFishModel for #name {
+                    fn model_name(&self) -> String {
+                        self.#core_field_name.model_name()
+                    }
                     /// get the id of the model object
                     fn id(&self) -> String {
                         self.#core_field_name.id()
