@@ -45,7 +45,7 @@ fn find_struct_definition(struct_name: &str) -> Option<DeriveInput> {
 // Check if we're in a workspace
 fn is_workspace() -> bool {
     let metadata = MetadataCommand::new().no_deps().exec().expect("Failed to get cargo metadata");
-    println!(" members {}", metadata.workspace_members.len());
+    // println!(" members {}", metadata.workspace_members.len());
     metadata.workspace_members.len() > 1
 }
 
@@ -54,7 +54,7 @@ fn find_struct_in_workspace(struct_name: &str) -> Option<DeriveInput> {
     let metadata = MetadataCommand::new().no_deps().exec().expect("Failed to get cargo metadata");
 
     for package in metadata.workspace_packages() {
-        println!("package.manifest_path {}", package.manifest_path);
+        // println!("package.manifest_path {}", package.manifest_path);
 
         if let Some(src_path) = package.manifest_path.parent() {
             if let Some(struct_def) = find_in_src_and_tests(&src_path.to_string(), struct_name) {
@@ -68,7 +68,7 @@ fn find_struct_in_workspace(struct_name: &str) -> Option<DeriveInput> {
 // Search for struct in a solo package
 fn find_struct_in_solo_package(struct_name: &str) -> Option<DeriveInput> {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
-    println!("manifest_dir {}", manifest_dir);
+    // println!("manifest_dir {}", manifest_dir);
     find_in_src_and_tests(&manifest_dir, struct_name)
 }
 
@@ -83,7 +83,7 @@ fn find_in_src_and_tests(src_path: &str, struct_name: &str) -> Option<DeriveInpu
 
 // General function to search for struct in a directory
 fn search_directory_for_struct(src_dir: &Path, struct_name: &str) -> Option<DeriveInput> {
-    println!("src_dir, struct_name: {:?} {}", src_dir, struct_name);
+    // println!("src_dir, struct_name: {:?} {}", src_dir, struct_name);
     for entry in WalkDir::new(src_dir)
         .into_iter()
         .filter_map(Result::ok)

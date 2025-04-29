@@ -243,7 +243,7 @@ struct StructInner {
     b: String,
 }
 
-#[derive(EightFishDTO, Debug)]
+#[derive(EightFishDTO, Debug, Serialize, Deserialize)]
 struct StructDTO {
     #[dtocore]
     inner: StructInner,
@@ -269,7 +269,7 @@ struct Inner0 {
     b: String,
 }
 
-#[derive(EightFishDTO, Debug)]
+#[derive(EightFishDTO, Debug, Serialize, Deserialize)]
 struct DTO00 {
     #[dtocore]
     inner: Inner0,
@@ -286,5 +286,9 @@ fn test_ef_dto_2() {
     assert_eq!(dto.inner.a, 1);
     assert_eq!(dto.inner.b, "test");
     assert_eq!(dto.other, "extra");
+
+    assert_eq!(dto.id(), "xxuuid");
+    assert_eq!(dto.inner.id(), "xxuuid");
+    assert_eq!(dto.calc_hash(), dto.inner.calc_hash());
 }
 

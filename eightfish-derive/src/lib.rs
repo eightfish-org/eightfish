@@ -178,14 +178,20 @@ pub fn eight_fish_dto_derive(input: TokenStream) -> TokenStream {
                             #(#other_field_idents: flattened.#other_field_idents,)*
                         }
                     }
+                }
 
+                impl EightFishModel for #name {
+                    /// get the id of the model object
+                    fn id(&self) -> String {
+                        self.#core_field_name.id()
+                    }
+                    /// calculate the hash of the model object
                     /// calculate the hash of the dto object
                     fn calc_hash(&self) -> String {
                         // dto's hash is the core's hash
                         self.#core_field_name.calc_hash()
                     }
                 }
-
 
                 impl From<#core_field_type> for #flattened_name {
                     fn from(core: #core_field_type) -> Self {
