@@ -99,3 +99,11 @@ impl EightFishResponse {
         self.result = result;
     }
 }
+
+#[macro_export]
+macro_rules! res_ok {
+    ($results:expr) => {
+        // assume in EightFish handler, the req object is named in the input parameter
+        Ok(EightFishResponse::new(Status::Successful, req.method(), $results))
+    };
+}

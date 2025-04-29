@@ -185,7 +185,7 @@ pub fn eight_fish_dto_derive(input: TokenStream) -> TokenStream {
                 impl EightFishModel for #name {
                     /// get the model name of the core type
                     fn model_name() -> String {
-                        #core_type_name.to_string()
+                        #core_type_name.to_string().to_lowercase()
                     }
                     /// get the id of the model object
                     fn id(&self) -> String {
