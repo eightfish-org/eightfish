@@ -15,57 +15,36 @@ pub trait EightFishModel: Serialize {
 }
 
 #[derive(Debug)]
-pub struct EightFishResponse {
+pub struct EightFishResponse<T: EightFishModel + Serialize> {
     status: Status,
-    method: Method,
-    model_name: String,
-    pair_list: Option<Vec<(String, String)>>,
-    result: Option<String>,
+    result: Option<Vec<T>>,
 }
 
-fn do_serialization<T: Serialize>(results: Vec<T>) -> String {
-    serde_json::to_string(&results).expect("error when do serde_json serialization.")
-}
+// fn do_serialization<T: Serialize>(result: Vec<T>) -> String {
+//     serde_json::to_string(&result)
+//         .expect("error when do serde_json serialization.")
+// }
 
-impl EightFishResponse {
+impl<T: EightFishModel + Serialize> EightFishResponse<T> {
     pub fn new<T: Serialize + EightFishModel>(
         status: Status,
-        method: Method,
-        results: Vec<T>,
+        result: Vec<T>,
     ) -> EightFishResponse {
         let model_name = T::model_name();
-        let pair_list;
-        let result;
 
-        if results.is_empty() {
-            pair_list = None;
-            result = None;
-        } else {
-            let a_pair_list = results
-                .iter()
-                .map(|obj| (obj.id(), obj.calc_hash()))
-                .collect();
-            pair_list = Some(a_pair_list);
-            let output = do_serialization(results);
-            result = Some(output);
-        }
+        // let output = do_serialization(result);
+        let result = Some(result);
 
         EightFishResponse {
             status,
-            method,
-            model_name,
-            pair_list,
             result,
         }
     }
 
-    pub fn from_str(status: Status, method: Method, results: String) -> EightFishResponse {
+    pub fn from_str(status: Status, result: String) -> EightFishResponse {
         EightFishResponse {
             status,
-            method,
-            model_name: "from_str".to_string(),
-            pair_list: None,
-            result: Some(results),
+            result: Some(result),
         }
     }
 
@@ -79,23 +58,13 @@ impl EightFishResponse {
         self.status = status;
     }
 
-    /// get response model_name field
-    pub fn model_name(&self) -> &str {
-        &self.model_name
-    }
-
-    /// get response pair_list
-    pub fn pair_list(&self) -> &Option<Vec<(String, String)>> {
-        &self.pair_list
-    }
-
     /// get response result
-    pub fn result(&self) -> &Option<String> {
+    pub fn result(&self) -> &Option<Vec<T>> {
         &self.result
     }
 
     /// set result
-    pub fn set_result(&mut self, result: Option<String>) {
+    pub fn set_result(&mut self, result: Option<Vec<T>>) {
         self.result = result;
     }
 }
