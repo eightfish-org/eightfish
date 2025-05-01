@@ -9,7 +9,7 @@ pub enum Status {
 }
 
 pub trait EightFishModel: Serialize {
-    fn model_name() -> String;
+    fn model_name(&self) -> String;
     fn id(&self) -> String;
     fn calc_hash(&self) -> String;
 }
@@ -24,7 +24,7 @@ pub struct EightFishResponse {
 }
 
 fn do_serialization<T: Serialize>(results: Vec<T>) -> String {
-    serde_json::to_string(&results).unwrap()
+    serde_json::to_string(&results).expect("error when do serde_json serialization.")
 }
 
 impl EightFishResponse {
@@ -63,7 +63,7 @@ impl EightFishResponse {
         EightFishResponse {
             status,
             method,
-            model_name: "".to_string(),
+            model_name: "from_str".to_string(),
             pair_list: None,
             result: Some(results),
         }

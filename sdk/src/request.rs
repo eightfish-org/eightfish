@@ -12,15 +12,19 @@ pub enum Method {
 pub struct EightFishRequest {
     method: Method,
     path: String,
+    reqid: String,
+    proto: Option<String>,
     data: Option<String>,
     ext: HashMap<String, String>,
 }
 
 impl EightFishRequest {
-    pub fn new(method: Method, path: String, data: Option<String>) -> EightFishRequest {
+    pub fn new(method: Method, path: String, reqid: String, proto: Option<String> data: Option<String>) -> EightFishRequest {
         EightFishRequest {
             method,
             path,
+            reqid,
+            proto,
             data,
             ext: HashMap::new(),
         }
@@ -34,6 +38,16 @@ impl EightFishRequest {
     /// get http path
     pub fn path(&self) -> &String {
         &self.path
+    }
+
+    /// get reqid
+    pub fn id(&self) -> &String {
+        &self.reqid
+    }
+
+    /// get proto name
+    pub fn proto(&self) -> &String {
+        &self.proto
     }
 
     /// get http data
