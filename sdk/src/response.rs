@@ -18,6 +18,7 @@ pub trait EightFishModel: Serialize {
 pub struct EightFishResponse<T: EightFishModel + Serialize> {
     status: Status,
     result: Option<Vec<T>>,
+    custom_result: Option<String>,
 }
 
 // fn do_serialization<T: Serialize>(result: Vec<T>) -> String {
@@ -29,22 +30,22 @@ impl<T: EightFishModel + Serialize> EightFishResponse<T> {
     pub fn new<T: Serialize + EightFishModel>(
         status: Status,
         result: Vec<T>,
-    ) -> EightFishResponse {
-        let model_name = T::model_name();
-
-        // let output = do_serialization(result);
+    ) -> Self {
         let result = Some(result);
+        let custom_result = None;
 
         EightFishResponse {
             status,
             result,
+            custom_result,
         }
     }
 
-    pub fn from_str(status: Status, result: String) -> EightFishResponse {
+    pub fn from_str(status: Status, custom_result: String) -> Self {
         EightFishResponse {
             status,
-            result: Some(result),
+            result: None,
+            custom_result: Some(custom_result)
         }
     }
 
@@ -67,12 +68,14 @@ impl<T: EightFishModel + Serialize> EightFishResponse<T> {
     pub fn set_result(&mut self, result: Option<Vec<T>>) {
         self.result = result;
     }
-}
 
-#[macro_export]
-macro_rules! res_ok {
-    ($results:expr) => {
-        // assume in EightFish handler, the req object is named in the input parameter
-        Ok(EightFishResponse::new(Status::Successful, req.method(), $results))
-    };
+    /// get response customized result
+    pub fn custom_result(&self) -> &Option<String> {
+        &self.custom_result
+    }
+
+    /// set custom result
+    pub fn set_custom_result(&mut self, custom_result: Option<String>) {
+        self.custom_result = custom_result;
+    }
 }

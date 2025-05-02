@@ -286,12 +286,23 @@ fn store_query_intermedia_result_to_cache(
             _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"200".to_vec());
         }
     } else {
-        let data_to_cache = "none".to_string();
-        _ = redis_conn.set(
-            &CACHE_RESULTS.replace('#', &reqid),
-            &data_to_cache.as_bytes().to_vec(),
-        );
-        _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"200".to_vec());
+        if &Some(ref astr) = res.custom_result() {
+            // return customized string body
+            let data_to_cache = astr.to_string();
+            _ = redis_conn.set(
+                &CACHE_RESULTS.replace('#', &reqid),
+                &data_to_cache.as_bytes().to_vec(),
+            );
+            _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"200".to_vec());
+        }
+        else {
+            let data_to_cache = "none".to_string();
+            _ = redis_conn.set(
+                &CACHE_RESULTS.replace('#', &reqid),
+                &data_to_cache.as_bytes().to_vec(),
+            );
+            _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"200".to_vec());
+        }
     }
 }
 
@@ -303,12 +314,6 @@ fn store_result_to_cache(
     if &Some(ref avec) = res.result() {
         let data_to_cache = serde_json::to_string(avec)
             .expect("error when do serde_json serialization.")
-
-        // // store to cache for http gate to retrieve
-        // _ = redis_conn.set(
-        //     &TMP_CACHE_RESULTS.replace('#', reqid),
-        //     &data_to_cache.as_bytes().to_vec(),
-        // );
 
         _ = redis_conn.set(
             &CACHE_RESULTS.replace('#', &reqid),
@@ -360,11 +365,11 @@ fn check_pair_list_from_vintage<T: EightFishModel + Serialize>(
 ) {
     let &Some(ref data) = ef_res.result() {
         if !data.is_empty() {
-            let pair_list = data.map(|&elem| (elem.model_name(), elem.id(), elem.calc_hash())).collect();
+            let triple_list = data.map(|&elem| (elem.model_name(), elem.id(), elem.calc_hash())).collect();
 
             let payload = json!({
                 "reqid": reqid,
-                "reqdata": Some(pair_list),
+                "reqdata": Some(triple_list),
             });
             println!("check_pair_list_from_vintage: payload: {:?}", payload);
             
@@ -393,12 +398,12 @@ fn err_process(err: anyhow::Error, redis_conn: &redis::Connection, reqid: &str) 
             _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"404".to_vec());
         }
         Some(s) => {
-            // write not found msg to cache
+            // 
             _ = redis_conn.set(&CACHE_RESULTS.replace('#', &reqid), &s.as_bytes().to_vec());
             _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"500".to_vec());
         }
         None => {
-            // write not found msg to cache
+            // 
             _ = redis_conn.set(
                 &CACHE_RESULTS.replace('#', &reqid),
                 &format!("{}", err).as_bytes().to_vec(),
@@ -419,7 +424,7 @@ macro_rules! sql_create_one {
             pg::Connection::open(&pg_addr).expect("error when open pg connection.");
 
         let (sql_statement, sql_params) = $instance.build_insert();
-        let res = pg_conn.execute(&sql_statement, &sql_params)?;
+        let res = pg_conn.query(&sql_statement, &sql_params)?;
         match res {
             Ok(_) => {
                 // update associated idhash table
@@ -427,10 +432,10 @@ macro_rules! sql_create_one {
                 let instance_id = $instance.id();
                 let instance_hash = $instance.calc_hash();
                 let sql_statement = format!(
-                    "insert into {table_name}_idhash values ('{}', '{}')",
+                    "insert into {table_name}_idhash values ('{}', '{}') RETURNING *",
                     instance_id, instance_hash
                 );
-                let res = pg_conn.execute(&sql_statement, &[]);
+                let res = pg_conn.query(&sql_statement, &[]);
                 match res {
                     Ok(_) => {
                         // recalculate the new instance's id hash pair
@@ -447,11 +452,12 @@ macro_rules! sql_create_one {
                         // update index to vintage
                         update_index_on_write(&redis_conn, &reqid, &proto_name, &vec![hash_triple]);
 
+                        Ok($instance)
                     }
-                    Err(_) => {}
+                    Err(e) => Err(e)
                 }
             }
-            Err(_) => {}
+            Err(e) => Err(e)
         }
     };
 }
@@ -464,16 +470,17 @@ macro_rules! sql_update_one {
         let pg_conn =
             pg::Connection::open(&pg_addr).expect("error when open pg connection.");
 
-        let (sql_statement, sql_params) = $instance.build_update_one();
-        let res = pg_conn.execute(&sql_statement, &sql_params)?;
+        let (sql_statement, sql_params) = $instance.build_update();
+        let res = pg_conn.query(&sql_statement, &sql_params)?;
         match res {
             Ok(_) => {
                 // update associated idhash table
                 let table_name = $instance.model_name();
                 let instance_id = $instance.id();
                 let instance_hash = $instance.calc_hash();
-                let sql_statement = format!("update {table_name}_idhash set hash='{instance_hash}' where id='{instance_id}'");
-                let res = pg_conn.execute(&sql_statement, &[]);
+                let sql_statement = 
+                    format!("update {table_name}_idhash set hash='{instance_hash}' where id='{instance_id}' RETURNING *");
+                let res = pg_conn.query(&sql_statement, &[]);
                 match res {
                     Ok(_) => {
                         // recalculate the new instance's id hash pair
@@ -490,11 +497,12 @@ macro_rules! sql_update_one {
                         // update index to vintage
                         update_index_on_write(&redis_conn, &reqid, &proto_name, &vec![hash_triple]);
 
+                        Ok($instance)
                     }
-                    Err(_) => {}
+                    Err(e) => Err(e)
                 }
             }
-            Err(_) => {}
+            Err(e) => Err(e)
         }
     };
 }
@@ -507,56 +515,66 @@ macro_rules! sql_update {
         let pg_conn =
             pg::Connection::open(&pg_addr).expect("error when open pg connection.");
 
-        let res = pg_conn.execute(&sql_statement, &sql_params)?;
+        let res = pg_conn.query(&sql_statement, &sql_params)?;
         match res {
-            Ok(rows) => {
-                let table_name = $model::model_name();
-
-                // MAKE SURE we get affected rows from the db update
-                let instances = $model::from_rows(rows);
-                // update associated idhash table
-                
-                let mut values = vec![];
-                let mut values_str = vec![];
-                
-                // collect affected rows' id and hash
-                for instance in instances {
-                    let instance_id = instance.id();
-                    let instance_hash = instance.calc_hash();
-                    values_str.push(format!("('{}', '{}')", instance_id, instance_hash));
-                    values.push((instance_id, instance_hash));
+            Ok(rowset) => {
+                let mut instances = vec![];
+                for row in rowset.rows {
+                    let instance = $model::from_row(row);
+                    instances.push(instance);
                 }
-                // construct a sql to update all associated rows in idhash table
-                let values_str = values_str.concat(", ");
-                let sql_statement = format!(#"
-                update {}_idhash set hash=v.hash FROM (VALUES
-                    {}
-                ) AS v(id, hash)
-                where id=v.id
-                "#, table_name, values_str);
-                let res = pg_conn.execute(&sql_statement, &[]);
-                match res {
-                    Ok(_) => {
-                        let triples = values.iter().map(|(&id, &hash)| {
-                            (table_name.clone(), id.clone(), hash.clone())
-                        }).collect();
-                        
-                        // assume there is always an instance named req in every handler context
-                        let reqid = req.id();
-                        let proto_name = req.proto();
-                        let redis_addr = std::env::var(REDIS_URL_ENV).expect("ENV REDIS_URL_ENV not set.");
-                        // println!("redis_addr: {}", redis_addr);
-                        let redis_conn = redis::Connection::open(&redis_addr)
-                            .expect("error when open redis connection.");
 
-                        // update index to vintage
-                        update_index_on_write(&redis_conn, &reqid, &proto_name, &triples);
+                if !instances.is_empty() {
+                    let table_name = $model::model_name();
 
+                    // update associated idhash table
+                    let mut values = vec![];
+                    let mut values_str = vec![];
+                    
+                    // collect affected rows' id and hash
+                    for instance in instances {
+                        let instance_id = instance.id();
+                        let instance_hash = instance.calc_hash();
+                        values_str.push(format!("('{}', '{}')", instance_id, instance_hash));
+                        values.push((instance_id, instance_hash));
                     }
-                    Err(_) => {}
+                    // construct a sql to update all associated rows in idhash table
+                    let values_str = values_str.concat(", ");
+                    let sql_statement = format!(#"
+                    update {}_idhash set hash=v.hash FROM (VALUES
+                        {}
+                    ) AS v(id, hash)
+                    where id=v.id
+                    RETURNING *
+                    "#, table_name, values_str);
+                    let res = pg_conn.query(&sql_statement, &[]);
+                    match res {
+                        Ok(_) => {
+                            let triples = values.iter().map(|(&id, &hash)| {
+                                (table_name.clone(), id.clone(), hash.clone())
+                            }).collect();
+                            
+                            // assume there is always an instance named req in every handler context
+                            let reqid = req.id();
+                            let proto_name = req.proto();
+                            let redis_addr = std::env::var(REDIS_URL_ENV).expect("ENV REDIS_URL_ENV not set.");
+                            // println!("redis_addr: {}", redis_addr);
+                            let redis_conn = redis::Connection::open(&redis_addr)
+                                .expect("error when open redis connection.");
+
+                            // update index to vintage
+                            update_index_on_write(&redis_conn, &reqid, &proto_name, &triples);
+
+                            Ok(instances)
+                        }
+                        Err(e) => Err(e)
+                    }
+                }
+                else {
+                    Ok(vec![])
                 }
             }
-            Err(_) => {}
+            Err(e) => Err(e)
         }
     };
 }
@@ -569,16 +587,16 @@ macro_rules! sql_delete_one {
         let pg_conn =
             pg::Connection::open(&pg_addr).expect("error when open pg connection.");
 
-        let (sql_statement, sql_params) = $instance.build_delete_one();
-        let res = pg_conn.execute(&sql_statement, &sql_params)?;
+        let (sql_statement, sql_params) = $instance.build_delete();
+        let res = pg_conn.query(&sql_statement, &sql_params)?;
         match res {
             Ok(_) => {
                 // update associated idhash table
                 let table_name = $instance.model_name();
                 let instance_id = $instance.id();
                 // let instance_hash = $instance.calc_hash();
-                let sql_statement = format!("delete {}_idhash where id='{}'", table_name, instance_id);
-                let res = pg_conn.execute(&sql_statement, &[]);
+                let sql_statement = format!("delete {}_idhash where id='{}' RETURNING *", table_name, instance_id);
+                let res = pg_conn.query(&sql_statement, &[]);
                 match res {
                     Ok(_) => {
                         // recalculate the new instance's id hash pair
@@ -596,11 +614,12 @@ macro_rules! sql_delete_one {
                         // update index to vintage
                         update_index_on_write(&redis_conn, &reqid, &proto_name, &vec![hash_triple]);
 
+                        Ok($instance)
                     }
-                    Err(_) => {}
+                    Err(e) => Err(e)
                 }
             }
-            Err(_) => {}
+            Err(e) => Err(e)
         }
     };
 }
@@ -613,52 +632,61 @@ macro_rules! sql_delete {
         let pg_conn =
             pg::Connection::open(&pg_addr).expect("error when open pg connection.");
 
-        let res = pg_conn.execute(&sql_statement, &sql_params)?;
+        let res = pg_conn.query(&sql_statement, &sql_params)?;
         match res {
-            Ok(rows) => {
-                let table_name = $model::model_name();
-
-                // MAKE SURE we get affected rows from the db update
-                let instances = $model::from_rows(rows);
-                // update associated idhash table
-                
-                let mut values = vec![];
-                let mut values_str = vec![];
-                
-                // collect affected rows' id and hash
-                for instance in instances {
-                    let instance_id = instance.id();
-                    // let instance_hash = instance.calc_hash();
-                    values_str.push(format!("'{}'", instance_id));
-                    values.push(instance_id);
+            Ok(rowset) => {
+                let mut instances = vec![];
+                for row in rowset.rows {
+                    let instance = $model::from_row(row);
+                    instances.push(instance);
                 }
-                // construct a sql to update all associated rows in idhash table
-                let values_str = values_str.concat(", ");
-                let sql_statement = format!(#"delete {}_idhash where id in ({})"#, table_name, values_str);
-                let res = pg_conn.execute(&sql_statement, &[]);
-                match res {
-                    Ok(_) => {
-                        let triples = values.iter().map(|(&id, &hash)| {
-                            (table_name.clone(), id.clone(), "".to_string())
-                        }).collect();
-                        
-                        // assume there is always an instance named req in every handler context
-                        let reqid = req.id();
-                        let proto_name = req.proto();
 
-                        let redis_addr = std::env::var(REDIS_URL_ENV).expect("ENV REDIS_URL_ENV not set.");
-                        // println!("redis_addr: {}", redis_addr);
-                        let redis_conn = redis::Connection::open(&redis_addr)
-                            .expect("error when open redis connection.");
+                if !instances.is_empty() {
+                    let table_name = $model::model_name();
 
-                        // update index to vintage
-                        update_index_on_write(&redis_conn, &reqid, &proto_name, &triples);
-
+                    // update associated idhash table
+                    let mut values = vec![];
+                    let mut values_str = vec![];
+                    
+                    // collect affected rows' id and hash
+                    for instance in instances {
+                        let instance_id = instance.id();
+                        // let instance_hash = instance.calc_hash();
+                        values_str.push(format!("'{}'", instance_id));
+                        values.push(instance_id);
                     }
-                    Err(_) => {}
+                    // construct a sql to update all associated rows in idhash table
+                    let values_str = values_str.concat(", ");
+                    let sql_statement = format!(#"delete {}_idhash where id in ({}) RETURNING *"#, table_name, values_str);
+                    let res = pg_conn.query(&sql_statement, &[]);
+                    match res {
+                        Ok(_) => {
+                            let triples = values.iter().map(|(&id, &hash)| {
+                                (table_name.clone(), id.clone(), "".to_string())
+                            }).collect();
+                            
+                            // assume there is always an instance named req in every handler context
+                            let reqid = req.id();
+                            let proto_name = req.proto();
+
+                            let redis_addr = std::env::var(REDIS_URL_ENV).expect("ENV REDIS_URL_ENV not set.");
+                            // println!("redis_addr: {}", redis_addr);
+                            let redis_conn = redis::Connection::open(&redis_addr)
+                                .expect("error when open redis connection.");
+
+                            // update index to vintage
+                            update_index_on_write(&redis_conn, &reqid, &proto_name, &triples);
+
+                            Ok(instances)
+                        }
+                        Err(e) => Err(e)
+                    }
+                }
+                else {
+                    Ok(vec![])
                 }
             }
-            Err(_) => {}
+            Err(e) => Err(e)
         }
     };
 }
@@ -671,7 +699,7 @@ macro_rules! sql_query_one {
         let pg_conn =
             pg::Connection::open(&pg_addr).expect("error when open pg connection.");
 
-        let (sql, sql_params) = $model::build_sql_query_by_id($id);
+        let (sql, sql_params) = $model::build_get_by_id($id);
         let rowset = pg_conn.query(&sql, &sql_params)?;
 
         if let Some(row) = rowset.rows.into_iter().next() {
