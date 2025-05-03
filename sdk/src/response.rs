@@ -30,9 +30,6 @@ impl EightFishModel for DefaultEightFishModel {
 }
 
 
-
-
-
 #[derive(Debug)]
 pub struct EightFishResponse<T = DefaultEightFishModel> 
 where

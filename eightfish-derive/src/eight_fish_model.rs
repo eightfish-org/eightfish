@@ -86,6 +86,23 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
         }
     });
     let update_params = create_params.clone();
+
+    // Generate a method for each field
+    let methods = fields.iter().map(|field| {
+        let field_name = field.ident.as_ref().unwrap();
+        let method_name = syn::Ident::new(
+            &format!("{}", field_name),
+            field_name.span(),
+        );
+        let field_name_str = field_name.to_string();
+
+        quote! {
+            pub fn #method_name() -> &'static str {
+                #field_name_str
+            }
+        }
+    });
+
     let output = quote! {
         impl #ident {
             /// get the table name of the model
@@ -184,6 +201,12 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
                 (Self::sql_delete(), Self::params_delete(id))
             }
         }
+        
+        // implement name_of_{field_name} serial methods for this struct
+        impl #ident {
+            #(#methods)*
+        }
+
         impl EightFishModel for #ident {
             /// get the model name of the type
             fn model_name(&self) -> String {
