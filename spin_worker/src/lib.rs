@@ -192,12 +192,6 @@ impl Worker {
                 let payload: Payload = serde_json::from_slice(&msg_obj.data)?;
                 println!("callback: update_index: payload: {:?}", payload);
                 let reqid = payload.reqid.to_owned();
-                // let id = payload.reqdata.unwrap();
-
-                // let result = json!({
-                //     "result": "Ok",
-                //     "id": id,
-                // });
 
                 // while getting the index updated callback, we put result http_gate wants into redis
                 // cache
@@ -207,16 +201,12 @@ impl Worker {
 
                 // in previous post process, we have set the TMP_CACHE_RESULTS
                 let tmpdata = redis_conn.get(&TMP_CACHE_RESULTS.replace('#', &reqid));
-                println!("callback: update_index: tmpdata: {:?}", tmpdata);
-                if let Ok(Some(tmpdata)) = tmpdata {
-                    // set to CACHE_RESULTS
-                    let _ = redis_conn.set(&CACHE_RESULTS.replace('#', &reqid), &tmpdata);
-                    // put status results behind to avoid the atomic result retrieving problem
-                    let cache_key = CACHE_STATUS_RESULTS.replace('#', &reqid);
-                    _ = redis_conn.set(&cache_key, &b"200".to_vec());
+                // println!("callback: update_index: tmpdata: {:?}", tmpdata);
+                if let Ok(Some(ref tmpdata)) = tmpdata {
+                    set_cache_result(&redis_conn, &reqid, tmpdata, "200");
                 }
                 // delete the tmp cache
-                _ = redis_conn.del(&[TMP_CACHE_RESULTS.replace('#', &reqid)]);
+                del_tmp_cache_result(&redis_conn, &reqid);
             }
             ACTION_CHECK_PAIR_LIST => {
                 let redis_addr = std::env::var(REDIS_URL_ENV)?;
@@ -231,25 +221,17 @@ impl Worker {
                 if &reqdata == "true" {
                     // check pass, get content from the tmp cache and write this content to a cache
                     let tmpdata = redis_conn.get(&TMP_CACHE_RESULTS.replace('#', &reqid));
-                    if let Ok(Some(tmpdata)) = tmpdata {
-                        let _ = redis_conn.set(&CACHE_RESULTS.replace('#', &reqid), &tmpdata);
-                        // put status results behind to avoid the atomic result retrieving problem
-                        _ = redis_conn
-                            .set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"200".to_vec());
+                    if let Ok(Some(ref tmpdata)) = tmpdata {
+                        set_cache_result(&redis_conn, &reqid, tmpdata, "200");
                     }
                     // delete the tmp cache
-                    _ = redis_conn.del(&[TMP_CACHE_RESULTS.replace('#', &reqid)]);
+                    del_tmp_cache_result(&redis_conn, &reqid);
                 } else {
                     let data = "check of pair list wrong!";
-                    _ = redis_conn.set(
-                        &CACHE_RESULTS.replace('#', &reqid),
-                        &data.as_bytes().to_vec(),
-                    );
-                    // put status results behind to avoid the atomic result retrieving problem
-                    _ = redis_conn
-                        .set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"400".to_vec());
+                    set_cache_result(&redis_conn, &reqid, data, "400");
+
                     // clear left tmp cache key
-                    _ = redis_conn.del(&[TMP_CACHE_RESULTS.replace('#', &reqid)]);
+                    del_tmp_cache_result(&redis_conn, &reqid);
                 }
             }
             &_ => {
@@ -261,10 +243,10 @@ impl Worker {
     }
 }
 
-fn store_query_intermedia_result_to_cache(
+fn store_query_intermedia_result_to_cache<T: EightFishModel + Serialize>(
     redis_conn: &redis::Connection,
     reqid: &str,
-    res: &EightFishResponse,
+    res: &EightFishResponse<T>,
 ) {
     if &Some(ref avec) = res.result() {
         if !avec.is_empty() {
@@ -272,80 +254,88 @@ fn store_query_intermedia_result_to_cache(
                 .expect("error when do serde_json serialization.")
 
             // store to tmp cache, when check_pair_list returns, get it
-            _ = redis_conn.set(
-                &TMP_CACHE_RESULTS.replace('#', reqid),
-                &data_to_cache.as_bytes().to_vec(),
-            );
+            set_tmp_cache_result(redis_conn, reqid, data_to_cache);
         }
         else {
-            let data_to_cache = "[]".to_string();
-            _ = redis_conn.set(
-                &CACHE_RESULTS.replace('#', &reqid),
-                &data_to_cache.as_bytes().to_vec(),
-            );
-            _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"200".to_vec());
+            let data_to_cache = "[]";
+            set_cache_result(redis_conn, reqid, data_to_cache,  "200");
         }
     } else {
         if &Some(ref astr) = res.custom_result() {
             // return customized string body
-            let data_to_cache = astr.to_string();
-            _ = redis_conn.set(
-                &CACHE_RESULTS.replace('#', &reqid),
-                &data_to_cache.as_bytes().to_vec(),
-            );
-            _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"200".to_vec());
+            let data_to_cache = astr;
+            set_cache_result(redis_conn, reqid, data_to_cache, "200");
         }
         else {
-            let data_to_cache = "none".to_string();
-            _ = redis_conn.set(
-                &CACHE_RESULTS.replace('#', &reqid),
-                &data_to_cache.as_bytes().to_vec(),
-            );
-            _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"200".to_vec());
+            let data_to_cache = "none";
+            set_cache_result(redis_conn, reqid, data_to_cache, "200");
         }
     }
 }
 
-fn store_result_to_cache(
+fn store_result_to_cache<T: EightFishModel + Serialize>(
     redis_conn: &redis::Connection,
     reqid: &str,
-    res: &EightFishResponse,
+    res: &EightFishResponse<T>,
 ) {
     if &Some(ref avec) = res.result() {
         let data_to_cache = serde_json::to_string(avec)
-            .expect("error when do serde_json serialization.")
-
-        _ = redis_conn.set(
-            &CACHE_RESULTS.replace('#', &reqid),
-            &data_to_cache.as_bytes().to_vec(),
-        );
-        _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"200".to_vec());
-        
+            .expect("error when do serde_json serialization.");
+        set_cache_result(redis_conn, reqid, &data_to_cache, "200");
     } else {
-        let data_to_cache = "none".to_string();
-        _ = redis_conn.set(
-            &CACHE_RESULTS.replace('#', &reqid),
-            &data_to_cache.as_bytes().to_vec(),
-        );
-        _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"200".to_vec());
+        if &Some(ref astr) = res.custom_result() {
+            // return customized string body
+            let data_to_cache = astr;
+            set_cache_result(redis_conn, reqid, data_to_cache, "200");
+        }
+        else {
+            let data_to_cache = "none";
+            set_cache_result(redis_conn, reqid, data_to_cache, "200");
+        }
     }
 }
+
+
+
+
+fn set_cache_result(redis_conn: &redis::Connection, reqid: &str, data_to_cache: &str, status_code: &str) {
+    _ = redis_conn.set(
+        &CACHE_RESULTS.replace('#', &reqid),
+        &data_to_cache.as_bytes().to_vec(),
+    );
+    _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &status_code.as_bytes().to_vec());
+}
+
+fn set_tmp_cache_result(redis_conn: &redis::Connection, reqid: &str, data_to_cache: &str) {
+    _ = redis_conn.set(
+        &TMP_CACHE_RESULTS.replace('#', reqid),
+        &data_to_cache.as_bytes().to_vec(),
+    );
+}
+
+fn del_tmp_cache_result(redis_conn: &redis::Connection, reqid: &str) {
+    _ = redis_conn.del(&[TMP_CACHE_RESULTS.replace('#', &reqid)]);
+}
+
+
+
 
 fn update_index_on_write(
     redis_conn: &redis::Connection,
     reqid: &str,
     proto_name: &str,
-    triple_list: &Vec<(String, String, String)>,
+    model_name: &str,
+    pair_list: &Vec<(String, String)>,
 ) {
     let payload = json!({
         "reqid": reqid,
-        "reqdata": Some(triple_list),
+        "reqdata": Some(pair_list),
     });
     println!("update_index_on_write: payload: {:?}", payload);
 
     let json_to_send = json!({
         "proto": proto_name,
-        "model": "",                // model name info has been put into payload reqdata
+        "model": model_name,
         "action": "update_index",
         "data": payload.to_string().as_bytes().to_vec(),
         "ext": Vec::<u8>::new(),
@@ -439,7 +429,7 @@ macro_rules! sql_create_one {
                 match res {
                     Ok(_) => {
                         // recalculate the new instance's id hash pair
-                        let hash_triple = (table_name, instance_id, instance_hash);
+                        let pair_list = vec![(table_name, instance_id, instance_hash)];
                         
                         // assume there is always an instance named req in every handler context
                         let reqid = req.id();
@@ -450,7 +440,7 @@ macro_rules! sql_create_one {
                             .expect("error when open redis connection.");
 
                         // update index to vintage
-                        update_index_on_write(&redis_conn, &reqid, &proto_name, &vec![hash_triple]);
+                        update_index_on_write(&redis_conn, &reqid, &proto_name, &table_name, &pair_list);
 
                         Ok($instance)
                     }
@@ -484,7 +474,7 @@ macro_rules! sql_update_one {
                 match res {
                     Ok(_) => {
                         // recalculate the new instance's id hash pair
-                        let hash_triple = (table_name, instance_id, instance_hash);
+                        let pair_list = vec![(instance_id, instance_hash)];
                         
                         // assume there is always an instance named req in every handler context
                         let reqid = req.id();
@@ -495,7 +485,7 @@ macro_rules! sql_update_one {
                             .expect("error when open redis connection.");
 
                         // update index to vintage
-                        update_index_on_write(&redis_conn, &reqid, &proto_name, &vec![hash_triple]);
+                        update_index_on_write(&redis_conn, &reqid, &proto_name, &table_name, &pair_list);
 
                         Ok($instance)
                     }
@@ -550,8 +540,8 @@ macro_rules! sql_update {
                     let res = pg_conn.query(&sql_statement, &[]);
                     match res {
                         Ok(_) => {
-                            let triples = values.iter().map(|(&id, &hash)| {
-                                (table_name.clone(), id.clone(), hash.clone())
+                            let pair_list = values.into_iter().map(|(id, hash)| {
+                                (id, hash)
                             }).collect();
                             
                             // assume there is always an instance named req in every handler context
@@ -563,7 +553,7 @@ macro_rules! sql_update {
                                 .expect("error when open redis connection.");
 
                             // update index to vintage
-                            update_index_on_write(&redis_conn, &reqid, &proto_name, &triples);
+                            update_index_on_write(&redis_conn, &reqid, &proto_name, &table_name, &pair_list);
 
                             Ok(instances)
                         }
@@ -600,7 +590,7 @@ macro_rules! sql_delete_one {
                 match res {
                     Ok(_) => {
                         // recalculate the new instance's id hash pair
-                        let hash_triple = (table_name, instance_id, "".to_string());
+                        let pair_list = vec![(instance_id, "".to_string())];
                         
                         // assume there is always an instance named req in every handler context
                         let reqid = req.id();
@@ -612,7 +602,7 @@ macro_rules! sql_delete_one {
                             .expect("error when open redis connection.");
 
                         // update index to vintage
-                        update_index_on_write(&redis_conn, &reqid, &proto_name, &vec![hash_triple]);
+                        update_index_on_write(&redis_conn, &reqid, &proto_name, &table_name, &pair_list);
 
                         Ok($instance)
                     }
@@ -661,8 +651,8 @@ macro_rules! sql_delete {
                     let res = pg_conn.query(&sql_statement, &[]);
                     match res {
                         Ok(_) => {
-                            let triples = values.iter().map(|(&id, &hash)| {
-                                (table_name.clone(), id.clone(), "".to_string())
+                            let pair_list = values.into_iter().map(|(id, _)| {
+                                (id, "".to_string())
                             }).collect();
                             
                             // assume there is always an instance named req in every handler context
@@ -675,7 +665,7 @@ macro_rules! sql_delete {
                                 .expect("error when open redis connection.");
 
                             // update index to vintage
-                            update_index_on_write(&redis_conn, &reqid, &proto_name, &triples);
+                            update_index_on_write(&redis_conn, &reqid, &proto_name, &table_name, &pair_list);
 
                             Ok(instances)
                         }
@@ -755,7 +745,7 @@ macro_rules! sql_query {
 
         let rowset = pg_conn.query(&sql_statement, &sql_params)?;
 
-        let instances = vec![];
+        let mut instances = vec![];
         for row in rowset.rows.into_iter() {
             let instance = $model::from_row(row);
             instances.push(instance);
@@ -785,7 +775,7 @@ macro_rules! sql_query {
                 idhash_map.insert(id, hash);
             }
 
-            // iterate on the input results to check
+            // check idhash table with instance list
             for instance in instances {
                 let id = instance.id();
                 let hash = instance.calc_hash();

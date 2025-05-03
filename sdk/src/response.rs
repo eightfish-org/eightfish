@@ -21,13 +21,8 @@ pub struct EightFishResponse<T: EightFishModel + Serialize> {
     custom_result: Option<String>,
 }
 
-// fn do_serialization<T: Serialize>(result: Vec<T>) -> String {
-//     serde_json::to_string(&result)
-//         .expect("error when do serde_json serialization.")
-// }
-
 impl<T: EightFishModel + Serialize> EightFishResponse<T> {
-    pub fn new<T: Serialize + EightFishModel>(
+    pub fn new(
         status: Status,
         result: Vec<T>,
     ) -> Self {
