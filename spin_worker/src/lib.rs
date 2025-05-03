@@ -182,31 +182,29 @@ impl Worker {
             }
             ACTION_UPDATE_INDEX => {
                 // Callback: handle the result of the update_index call event
-                // the format of the msg_obj.data is: reqid:id:hash
-                // and msg.model is model, msg.action is action
-                //let v: Vec<&str> = std::str::from_utf8(&msg_obj.data).unwrap().split(':').collect();
-                //println!("index_update callback: v: {:?}", v);
-                //let reqid = &v[0];
-                //let id = &v[1];
-                //let hash = &v[2];
                 let payload: Payload = serde_json::from_slice(&msg_obj.data)?;
                 println!("callback: update_index: payload: {:?}", payload);
-                let reqid = payload.reqid.to_owned();
 
-                // while getting the index updated callback, we put result http_gate wants into redis
-                // cache
-                let redis_addr = std::env::var(REDIS_URL_ENV)?;
-                let redis_conn = redis::Connection::open(&redis_addr)
-                    .expect("error when open redis connection.");
+                // TODO: we need handle the error case when vintage throws erros
+                // put it in the future version
 
-                // in previous post process, we have set the TMP_CACHE_RESULTS
-                let tmpdata = redis_conn.get(&TMP_CACHE_RESULTS.replace('#', &reqid));
-                // println!("callback: update_index: tmpdata: {:?}", tmpdata);
-                if let Ok(Some(ref tmpdata)) = tmpdata {
-                    set_cache_result(&redis_conn, &reqid, tmpdata, "200");
-                }
-                // delete the tmp cache
-                del_tmp_cache_result(&redis_conn, &reqid);
+                // ====  old code, no need seemingly ====
+                // let reqid = payload.reqid.to_owned();
+
+                // // while getting the index updated callback, we put result http_gate wants into redis
+                // // cache
+                // let redis_addr = std::env::var(REDIS_URL_ENV)?;
+                // let redis_conn = redis::Connection::open(&redis_addr)
+                //     .expect("error when open redis connection.");
+
+                // // in previous post process, we have set the TMP_CACHE_RESULTS
+                // let tmpdata = redis_conn.get(&TMP_CACHE_RESULTS.replace('#', &reqid));
+                // // println!("callback: update_index: tmpdata: {:?}", tmpdata);
+                // if let Ok(Some(ref tmpdata)) = tmpdata {
+                //     set_cache_result(&redis_conn, &reqid, tmpdata, "200");
+                // }
+                // // delete the tmp cache
+                // del_tmp_cache_result(&redis_conn, &reqid);
             }
             ACTION_CHECK_PAIR_LIST => {
                 let redis_addr = std::env::var(REDIS_URL_ENV)?;
@@ -227,7 +225,7 @@ impl Worker {
                     // delete the tmp cache
                     del_tmp_cache_result(&redis_conn, &reqid);
                 } else {
-                    let data = "check of pair list wrong!";
+                    let data = "The result of checking pair list is wrong!";
                     set_cache_result(&redis_conn, &reqid, data, "400");
 
                     // clear left tmp cache key
