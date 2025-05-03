@@ -14,8 +14,30 @@ pub trait EightFishModel: Serialize {
     fn calc_hash(&self) -> String;
 }
 
+#[derive(Serialize, Debug)]
+pub struct DefaultEightFishModel;
+
+impl EightFishModel for DefaultEightFishModel {
+    fn model_name(&self) -> String {
+        "DefaultEightFishModel".to_string()
+    }
+    fn id(&self) -> String {
+        "DefaultEightFishModel".to_string()
+    }
+    fn calc_hash(&self) -> String {
+        "DefaultEightFishModel".to_string()
+    }
+}
+
+
+
+
+
 #[derive(Debug)]
-pub struct EightFishResponse<T: EightFishModel + Serialize> {
+pub struct EightFishResponse<T = DefaultEightFishModel> 
+where
+    T: EightFishModel + Serialize
+{
     status: Status,
     result: Option<Vec<T>>,
     custom_result: Option<String>,
