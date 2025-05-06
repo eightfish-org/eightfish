@@ -45,6 +45,8 @@ pub struct Payload {
 
 #[derive(Deserialize, Debug)]
 pub struct ExtPayload {
+    block_height: u64,
+    block_hash: String,
     time: u64,
     nonce: u64,
     randomvec: Vec<u8>,
@@ -66,12 +68,13 @@ impl Worker {
         match &msg_obj.action[..] {
             ACTION_NEW_BLOCK_HEIGHT => {
                 // use msg as a timer, tick on every block height
-                let body: [u8; 8] = msg_obj.data.try_into().unwrap_or([0; 8]);
+                // let body: [u8; 8] = msg_obj.data.try_into().unwrap_or([0; 8]);
                 // convert to u64
-                let _block_height = u64::from_be_bytes(body);
+                // let _block_height = u64::from_be_bytes(body);
 
                 // do something
                 // println!("Block height: {block_height}");
+                // println!("Block hash: {block_hash}");
             }
             ACTION_UPLOAD_WASM => {
                 // do nothing, wasm_worker itself doesn't care about new wasm file uploaded
@@ -108,16 +111,16 @@ impl Worker {
                 let reqdata = payload.reqdata;
 
                 let mut ef_req = EightFishRequest::new(method, path, reqid, proto_name, reqdata);
-                println!("Worker::work: in query branch: ef_req");
+                // println!("Worker::work: in query branch: ef_req");
 
                 let ef_res = self.app.handle(&mut ef_req);
                 match ef_res {
                     Ok(ef_res) => {
-                        println!("Worker::work: in query branch: ef_res: {:?}", ef_res);
+                        // println!("Worker::work: in query branch: ef_res: {:?}", ef_res);
                         // we check the intermediate result  in the framework internal
                         store_query_intermedia_result_to_cache(&redis_conn, &reqid, &ef_res);
 
-                        if &Some(ref avec) = res.result() {
+                        if let &Some(ref avec) = res.result() {
                             if !avec.is_empty() {
                                 check_pair_list_from_vintage(
                                     &redis_conn,
@@ -152,18 +155,25 @@ impl Worker {
                 let reqdata = payload.reqdata;
                 let ext: ExtPayload = serde_json::from_slice(&msg_obj.ext)?;
 
-                let mut ef_req = EightFishRequest::new(method, path, reqdata);
-                println!("Worker::work: in post branch: ef_req");
+                let mut ef_req = EightFishRequest::new(method, path, reqid, proto_name, reqdata);
+                // println!("Worker::work: in post branch: ef_req");
 
-                // add time to req.ext
+                // insert block_height, block_hash, time, nonce and random_str to req.ext
+                ef_req
+                    .ext_mut()
+                    .insert("block_height".to_string(), ext.block_height.to_string());
+                // encode the hex digitals as base58 string
+                let block_hash_str = bs58::encode(&ext.block_hash).into_string();
+                ef_req
+                    .ext_mut()
+                    .insert("block_hash".to_string(), block_hash_str);
                 ef_req
                     .ext_mut()
                     .insert("time".to_string(), ext.time.to_string());
-                // add nonce to req.ext
                 ef_req
                     .ext_mut()
                     .insert("nonce".to_string(), ext.nonce.to_string());
-                // encode the vec<u8> as base58 string, and add random_str to req.ext
+                // encode the vec<u8> as base58 string
                 let random_string = bs58::encode(&ext.randomvec).into_string();
                 ef_req
                     .ext_mut()
