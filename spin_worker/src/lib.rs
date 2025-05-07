@@ -8,8 +8,8 @@ use serde::Deserialize;
 use serde_json::json;
 use spin_sdk::{redis, variables};
 
-const REDIS_URL_ENV: &str = "REDIS_URL";
-const DB_URL_ENV: &str = "DB_URL";
+const REDIS_URL: &str = "REDIS_URL";
+const DB_URL: &str = "DB_URL";
 const TMP_CACHE_RESULTS: &str = "tmp:cache:#";
 const CACHE_STATUS_RESULTS: &str = "cache:status:#";
 const CACHE_RESULTS: &str = "cache:#";
@@ -94,7 +94,7 @@ impl Worker {
                 // }
             }
             ACTION_GET => {
-                let redis_addr = std::env::var(REDIS_URL_ENV)?;
+                let redis_addr = std::env::var(REDIS_URL)?;
                 let redis_conn = redis::Connection::open(&redis_addr)
                     .expect("error when open redis connection.");
 
@@ -139,12 +139,12 @@ impl Worker {
                 }
             }
             ACTION_POST | ACTION_PUT | ACTION_DELETE => {
-                let redis_addr = std::env::var(REDIS_URL_ENV)?;
+                let redis_addr = std::env::var(REDIS_URL)?;
                 println!("redis_addr: {}", redis_addr);
                 let redis_conn = redis::Connection::open(&redis_addr)
                     .expect("error when open redis connection.");
 
-                let pg_addr = std::env::var(DB_URL_ENV)?;
+                let pg_addr = std::env::var(DB_URL)?;
                 println!("pg_addr: {}", pg_addr);
                 // let pg_conn =
                 //     pg::Connection::open(&pg_addr).expect("error when open pg connection.");
@@ -200,27 +200,9 @@ impl Worker {
 
                 // TODO: we need handle the error case when vintage throws erros
                 // put it in the future version
-
-                // ====  old code, no need seemingly ====
-                // let reqid = payload.reqid.to_owned();
-
-                // // while getting the index updated callback, we put result http_gate wants into redis
-                // // cache
-                // let redis_addr = std::env::var(REDIS_URL_ENV)?;
-                // let redis_conn = redis::Connection::open(&redis_addr)
-                //     .expect("error when open redis connection.");
-
-                // // in previous post process, we have set the TMP_CACHE_RESULTS
-                // let tmpdata = redis_conn.get(&TMP_CACHE_RESULTS.replace('#', &reqid));
-                // // println!("callback: update_index: tmpdata: {:?}", tmpdata);
-                // if let Ok(Some(ref tmpdata)) = tmpdata {
-                //     set_cache_result(&redis_conn, &reqid, tmpdata, "200");
-                // }
-                // // delete the tmp cache
-                // del_tmp_cache_result(&redis_conn, &reqid);
             }
             ACTION_CHECK_PAIR_LIST => {
-                let redis_addr = std::env::var(REDIS_URL_ENV)?;
+                let redis_addr = std::env::var(REDIS_URL)?;
                 let redis_conn = redis::Connection::open(&redis_addr)
                     .expect("error when open redis connection.");
 
@@ -324,34 +306,6 @@ fn del_tmp_cache_result(redis_conn: &redis::Connection, reqid: &str) {
     _ = redis_conn.del(&[TMP_CACHE_RESULTS.replace('#', &reqid)]);
 }
 
-#[allow(dead_code)]
-fn update_index_on_write(
-    redis_conn: &redis::Connection,
-    reqid: &str,
-    proto_name: &str,
-    model_name: &str,
-    pair_list: &Vec<(String, String)>,
-) {
-    let payload = json!({
-        "reqid": reqid,
-        "reqdata": Some(pair_list),
-    });
-    println!("update_index_on_write: payload: {:?}", payload);
-
-    let json_to_send = json!({
-        "proto": proto_name,
-        "model": model_name,
-        "action": "update_index",
-        "data": payload.to_string().as_bytes().to_vec(),
-        "ext": Vec::<u8>::new(),
-    });
-
-    _ = redis_conn.publish(
-        CHANNEL_GATE2VIN,
-        &json_to_send.to_string().as_bytes().to_vec(),
-    );
-}
-
 fn check_pair_list_from_vintage(
     redis_conn: &redis::Connection,
     reqid: &str,
@@ -409,15 +363,45 @@ fn err_process(err: anyhow::Error, redis_conn: &redis::Connection, reqid: &str) 
     Err(anyhow!("handler error"))
 }
 
+#[allow(dead_code)]
+pub fn update_index_on_write(
+    redis_conn: &redis::Connection,
+    reqid: &str,
+    proto_name: &str,
+    model_name: &str,
+    pair_list: &Vec<(String, String)>,
+) {
+    let payload = json!({
+        "reqid": reqid,
+        "reqdata": Some(pair_list),
+    });
+    println!("update_index_on_write: payload: {:?}", payload);
+
+    let json_to_send = json!({
+        "proto": proto_name,
+        "model": model_name,
+        "action": "update_index",
+        "data": payload.to_string().as_bytes().to_vec(),
+        "ext": Vec::<u8>::new(),
+    });
+
+    _ = redis_conn.publish(
+        CHANNEL_GATE2VIN,
+        &json_to_send.to_string().as_bytes().to_vec(),
+    );
+}
+
 #[macro_export]
 macro_rules! sql_create_one {
-    ($instance:expr) => {
-        let pg_addr = std::env::var(DB_URL_ENV).expect("ENV DB_URL not set.");
+    ($instance:expr) => {{
+        use spin_sdk::{pg, redis};
+
+        let pg_addr = std::env::var(DB_URL).expect("ENV DB_URL not set.");
         // println!("pg_addr: {}", pg_addr);
         let pg_conn = pg::Connection::open(&pg_addr).expect("error when open pg connection.");
 
         let (sql_statement, sql_params) = $instance.build_insert();
-        let res = pg_conn.query(&sql_statement, &sql_params)?;
+        let res = pg_conn.query(&sql_statement, &sql_params);
         match res {
             Ok(_) => {
                 // update associated idhash table
@@ -434,17 +418,16 @@ macro_rules! sql_create_one {
                         // recalculate the new instance's id hash pair
                         let pair_list = vec![(instance_id, instance_hash)];
 
-                        // assume there is always an instance named req in every handler context
+                        // assume there is always an instance named `req` in every handler context
                         let reqid = req.id();
-                        let proto_name = req.proto();
-                        let redis_addr =
-                            std::env::var(REDIS_URL_ENV).expect("ENV REDIS_URL_ENV not set.");
+                        let proto_name = req.proto().to_owned().unwrap_or_default();
+                        let redis_addr = std::env::var(REDIS_URL).expect("ENV REDIS_URLnot set.");
                         // println!("redis_addr: {}", redis_addr);
                         let redis_conn = redis::Connection::open(&redis_addr)
                             .expect("error when open redis connection.");
 
                         // update index to vintage
-                        update_index_on_write(
+                        spin_worker::update_index_on_write(
                             &redis_conn,
                             &reqid,
                             &proto_name,
@@ -459,13 +442,13 @@ macro_rules! sql_create_one {
             }
             Err(e) => Err(e),
         }
-    };
+    }};
 }
 
 #[macro_export]
 macro_rules! sql_update_one {
     ($instance:expr) => {
-        let pg_addr = std::env::var(DB_URL_ENV).expect("ENV DB_URL_ENV not set.");
+        let pg_addr = std::env::var(DB_URL).expect("ENV DB_URLnot set.");
         // println!("pg_addr: {}", pg_addr);
         let pg_conn =
             pg::Connection::open(&pg_addr).expect("error when open pg connection.");
@@ -489,7 +472,7 @@ macro_rules! sql_update_one {
                         // assume there is always an instance named req in every handler context
                         let reqid = req.id();
                         let proto_name = req.proto();
-                        let redis_addr = std::env::var(REDIS_URL_ENV).expect("ENV REDIS_URL_ENV not set.");
+                        let redis_addr = std::env::var(REDIS_URL).expect("ENV REDIS_URL not set.");
                         // println!("redis_addr: {}", redis_addr);
                         let redis_conn = redis::Connection::open(&redis_addr)
                             .expect("error when open redis connection.");
@@ -510,7 +493,7 @@ macro_rules! sql_update_one {
 #[macro_export]
 macro_rules! sql_update {
     ($model: ty, $sql_statement: expr, $sql_params: expr) => {
-        let pg_addr = std::env::var(DB_URL_ENV).expect("ENV DB_URL_ENV not set.");
+        let pg_addr = std::env::var(DB_URL).expect("ENV DB_URL not set.");
         // println!("pg_addr: {}", pg_addr);
         let pg_conn =
             pg::Connection::open(&pg_addr).expect("error when open pg connection.");
@@ -557,7 +540,7 @@ macro_rules! sql_update {
                             // assume there is always an instance named req in every handler context
                             let reqid = req.id();
                             let proto_name = req.proto();
-                            let redis_addr = std::env::var(REDIS_URL_ENV).expect("ENV REDIS_URL_ENV not set.");
+                            let redis_addr = std::env::var(REDIS_URL).expect("ENV REDIS_URL not set.");
                             // println!("redis_addr: {}", redis_addr);
                             let redis_conn = redis::Connection::open(&redis_addr)
                                 .expect("error when open redis connection.");
@@ -582,7 +565,7 @@ macro_rules! sql_update {
 #[macro_export]
 macro_rules! sql_delete_one {
     ($instance:expr) => {
-        let pg_addr = std::env::var(DB_URL_ENV).expect("ENV DB_URL_ENV not set.");
+        let pg_addr = std::env::var(DB_URL).expect("ENV DB_URL not set.");
         // println!("pg_addr: {}", pg_addr);
         let pg_conn = pg::Connection::open(&pg_addr).expect("error when open pg connection.");
 
@@ -608,8 +591,7 @@ macro_rules! sql_delete_one {
                         let reqid = req.id();
                         let proto_name = req.proto();
 
-                        let redis_addr =
-                            std::env::var(REDIS_URL_ENV).expect("ENV REDIS_URL_ENV not set.");
+                        let redis_addr = std::env::var(REDIS_URL).expect("ENV REDIS_URL not set.");
                         // println!("redis_addr: {}", redis_addr);
                         let redis_conn = redis::Connection::open(&redis_addr)
                             .expect("error when open redis connection.");
@@ -636,7 +618,7 @@ macro_rules! sql_delete_one {
 #[macro_export]
 macro_rules! sql_delete {
     ($model: ty, $sql_statement: expr, $sql_params: expr) => {
-        let pg_addr = std::env::var(DB_URL_ENV).expect("ENV DB_URL_ENV not set.");
+        let pg_addr = std::env::var(DB_URL).expect("ENV DB_URL not set.");
         // println!("pg_addr: {}", pg_addr);
         let pg_conn =
             pg::Connection::open(&pg_addr).expect("error when open pg connection.");
@@ -678,7 +660,7 @@ macro_rules! sql_delete {
                             let reqid = req.id();
                             let proto_name = req.proto();
 
-                            let redis_addr = std::env::var(REDIS_URL_ENV).expect("ENV REDIS_URL_ENV not set.");
+                            let redis_addr = std::env::var(REDIS_URL).expect("ENV REDIS_URL not set.");
                             // println!("redis_addr: {}", redis_addr);
                             let redis_conn = redis::Connection::open(&redis_addr)
                                 .expect("error when open redis connection.");
@@ -702,16 +684,20 @@ macro_rules! sql_delete {
 
 #[macro_export]
 macro_rules! sql_query_one {
-    ($model: ty, $id: expr) => {
-        let pg_addr = std::env::var(DB_URL_ENV).expect("ENV DB_URL_ENV not set.");
+    ($model: ty, $id: expr) => {{
+        use spin_sdk::pg;
+        use std::collections::HashMap;
+
+        let pg_addr = std::env::var(DB_URL).expect("ENV DB_URL not set.");
         // println!("pg_addr: {}", pg_addr);
         let pg_conn = pg::Connection::open(&pg_addr).expect("error when open pg connection.");
 
-        let (sql, sql_params) = $model::build_get_by_id($id);
+        let (sql, sql_params) = <$model>::build_get_by_id($id);
         let rowset = pg_conn.query(&sql, &sql_params)?;
 
+        let table_name = <$model>::model_name();
         if let Some(row) = rowset.rows.into_iter().next() {
-            let instance = $model::from_row(row);
+            let instance = <$model>::from_row(row);
 
             // step: we need to query from idhash table to compare
             let ids_string = format!("'{}'", $id);
@@ -728,7 +714,7 @@ macro_rules! sql_query_one {
                 idhash_map.insert(id, hash);
             }
 
-            let instances = vec![instance];
+            let instances = vec![&instance];
 
             // iterate on the input results to check
             for instance in instances {
@@ -736,7 +722,7 @@ macro_rules! sql_query_one {
                 let hash = instance.calc_hash();
                 let hash_from_map = idhash_map.get(&id[..]).expect("idhash_map get error");
 
-                if hash != hash_from_map {
+                if &hash != hash_from_map {
                     println!("compare hash, hash_from_map: {}, {}", hash, hash_from_map);
                     return Err(anyhow!("Hash mismatching.".to_string()));
                 }
@@ -747,14 +733,14 @@ macro_rules! sql_query_one {
             // error
             // bail!("no this item".to_string());
             None
-        };
-    };
+        }
+    }};
 }
 
 #[macro_export]
 macro_rules! sql_query {
     ($model: ty, $sql_statement: expr, $sql_params: expr) => {
-        let pg_addr = std::env::var(DB_URL_ENV).expect("ENV DB_URL_ENV not set.");
+        let pg_addr = std::env::var(DB_URL).expect("ENV DB_URL not set.");
         // println!("pg_addr: {}", pg_addr);
         let pg_conn = pg::Connection::open(&pg_addr).expect("error when open pg connection.");
 

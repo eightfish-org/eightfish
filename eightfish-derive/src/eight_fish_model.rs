@@ -206,7 +206,7 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
 
         impl EightFishModel for #ident {
             /// get the model name of the type
-            fn model_name() -> String {
+            fn model_name(&self) -> String {
                 Self::model_name()
             }
             /// get the id of the model object

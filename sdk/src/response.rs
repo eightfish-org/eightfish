@@ -8,7 +8,7 @@ pub enum Status {
 }
 
 pub trait EightFishModel: Serialize {
-    fn model_name() -> String;
+    fn model_name(&self) -> String;
     fn id(&self) -> String;
     fn calc_hash(&self) -> String;
 }
@@ -23,10 +23,14 @@ pub struct EightFishResponse {
 }
 
 impl EightFishResponse {
-    pub fn new<T: EightFishModel, Serialize>(status: Status, result: Vec<T>) -> Self {
+    pub fn new<T: EightFishModel + Serialize>(status: Status, result: Vec<T>) -> Self {
         let custom_result = None;
 
-        let model_name = T::model_name();
+        let model_name = if result.is_empty() {
+            None
+        } else {
+            Some(result[0].model_name())
+        };
         let pair_list = result
             .iter()
             .map(|elem| (elem.id(), elem.calc_hash()))
@@ -38,7 +42,7 @@ impl EightFishResponse {
             status,
             result: Some(data),
             custom_result,
-            model_name: Some(model_name),
+            model_name,
             pair_list: Some(pair_list),
         }
     }

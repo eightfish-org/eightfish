@@ -13,7 +13,6 @@ pub use app::EightFishRouter as Router;
 pub use app::GlobalFilter;
 pub use app::{Error, Result};
 pub use handler::EightFishHandler as Handler;
+pub use recognizer::Params as RecognizerParams;
 pub use request::{EightFishRequest as Request, Method};
 pub use response::{EightFishModel, EightFishResponse as Response, Status};
-
-pub use recognizer::Params as RecognizerParams;
