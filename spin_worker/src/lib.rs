@@ -393,7 +393,7 @@ pub fn update_index_on_write(
 
 #[macro_export]
 macro_rules! sql_create_one {
-    ($instance:expr) => {{
+    ($req:expr, $instance:expr) => {{
         use spin_sdk::{pg, redis};
 
         let pg_addr = std::env::var(DB_URL).expect("ENV DB_URL not set.");
@@ -419,8 +419,8 @@ macro_rules! sql_create_one {
                         let pair_list = vec![(instance_id, instance_hash)];
 
                         // assume there is always an instance named `req` in every handler context
-                        let reqid = req.id();
-                        let proto_name = req.proto().to_owned().unwrap_or_default();
+                        let reqid = $req.id();
+                        let proto_name = $req.proto().to_owned().unwrap_or_default();
                         let redis_addr = std::env::var(REDIS_URL).expect("ENV REDIS_URLnot set.");
                         // println!("redis_addr: {}", redis_addr);
                         let redis_conn = redis::Connection::open(&redis_addr)
