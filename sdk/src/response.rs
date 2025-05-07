@@ -1,4 +1,3 @@
-use crate::request::Method;
 use serde::Serialize;
 
 /// Response status
@@ -9,45 +8,38 @@ pub enum Status {
 }
 
 pub trait EightFishModel: Serialize {
-    fn model_name(&self) -> String;
+    fn model_name() -> String;
     fn id(&self) -> String;
     fn calc_hash(&self) -> String;
 }
 
-#[derive(Serialize, Debug)]
-pub struct DefaultEightFishModel;
-
-impl EightFishModel for DefaultEightFishModel {
-    fn model_name(&self) -> String {
-        "DefaultEightFishModel".to_string()
-    }
-    fn id(&self) -> String {
-        "DefaultEightFishModel".to_string()
-    }
-    fn calc_hash(&self) -> String {
-        "DefaultEightFishModel".to_string()
-    }
-}
-
 #[derive(Debug)]
-pub struct EightFishResponse<T = DefaultEightFishModel>
-where
-    T: EightFishModel + Serialize,
-{
+pub struct EightFishResponse {
     status: Status,
-    result: Option<Vec<T>>,
+    result: Option<String>,
     custom_result: Option<String>,
+    model_name: Option<String>,
+    pair_list: Option<Vec<(String, String)>>,
 }
 
-impl<T: EightFishModel + Serialize> EightFishResponse<T> {
-    pub fn new(status: Status, result: Vec<T>) -> Self {
-        let result = Some(result);
+impl EightFishResponse {
+    pub fn new<T: EightFishModel, Serialize>(status: Status, result: Vec<T>) -> Self {
         let custom_result = None;
+
+        let model_name = T::model_name();
+        let pair_list = result
+            .iter()
+            .map(|elem| (elem.id(), elem.calc_hash()))
+            .collect();
+
+        let data = serde_json::to_string(&result).expect("error when do serde_json serialization.");
 
         EightFishResponse {
             status,
-            result,
+            result: Some(data),
             custom_result,
+            model_name: Some(model_name),
+            pair_list: Some(pair_list),
         }
     }
 
@@ -56,6 +48,8 @@ impl<T: EightFishModel + Serialize> EightFishResponse<T> {
             status,
             result: None,
             custom_result: Some(custom_result),
+            model_name: None,
+            pair_list: None,
         }
     }
 
@@ -70,12 +64,12 @@ impl<T: EightFishModel + Serialize> EightFishResponse<T> {
     }
 
     /// get response result
-    pub fn result(&self) -> &Option<Vec<T>> {
+    pub fn result(&self) -> &Option<String> {
         &self.result
     }
 
     /// set result
-    pub fn set_result(&mut self, result: Option<Vec<T>>) {
+    pub fn set_result(&mut self, result: Option<String>) {
         self.result = result;
     }
 
@@ -87,5 +81,15 @@ impl<T: EightFishModel + Serialize> EightFishResponse<T> {
     /// set custom result
     pub fn set_custom_result(&mut self, custom_result: Option<String>) {
         self.custom_result = custom_result;
+    }
+
+    // get model name
+    pub fn model_name(&self) -> &Option<String> {
+        &self.model_name
+    }
+
+    /// get pair list
+    pub fn pair_list(&self) -> &Option<Vec<(String, String)>> {
+        &self.pair_list
     }
 }

@@ -1,19 +1,15 @@
 use anyhow::{anyhow, Result};
 use bytes::Bytes;
 use eightfish_sdk::{
-    App as EightFishApp, Handler, HandlerCRUD, Method, Request as EightFishRequest,
+    App as EightFishApp, Handler, Method, Request as EightFishRequest,
     Response as EightFishResponse,
 };
 use serde::Deserialize;
 use serde_json::json;
-use spin_sdk::{
-    pg::{self, Decode},
-    redis, variables,
-};
-use std::collections::HashMap;
+use spin_sdk::{redis, variables};
 
-const REDIS_URL_ENV: &str = "REDIS_URL_ENV";
-const DB_URL_ENV: &str = "DB_URL_ENV";
+const REDIS_URL_ENV: &str = "REDIS_URL";
+const DB_URL_ENV: &str = "DB_URL";
 const TMP_CACHE_RESULTS: &str = "tmp:cache:#";
 const CACHE_STATUS_RESULTS: &str = "cache:status:#";
 const CACHE_RESULTS: &str = "cache:#";
@@ -110,23 +106,29 @@ impl Worker {
                 let reqid = payload.reqid.to_owned();
                 let reqdata = payload.reqdata;
 
-                let mut ef_req = EightFishRequest::new(method, path, reqid, proto_name, reqdata);
+                let mut ef_req = EightFishRequest::new(
+                    method,
+                    path,
+                    reqid.clone(),
+                    Some(proto_name.clone()),
+                    reqdata,
+                );
                 // println!("Worker::work: in query branch: ef_req");
 
                 let ef_res = self.app.handle(&mut ef_req);
                 match ef_res {
                     Ok(ef_res) => {
-                        // println!("Worker::work: in query branch: ef_res: {:?}", ef_res);
-                        // we check the intermediate result  in the framework internal
                         store_query_intermedia_result_to_cache(&redis_conn, &reqid, &ef_res);
 
-                        if let &Some(ref avec) = res.result() {
+                        if let &Some(ref avec) = ef_res.pair_list() {
                             if !avec.is_empty() {
+                                let model_name = ef_res.model_name().as_ref().unwrap();
                                 check_pair_list_from_vintage(
                                     &redis_conn,
                                     &reqid,
                                     &proto_name,
-                                    ef_res,
+                                    model_name,
+                                    &ef_res,
                                 );
                             }
                         }
@@ -144,8 +146,8 @@ impl Worker {
 
                 let pg_addr = std::env::var(DB_URL_ENV)?;
                 println!("pg_addr: {}", pg_addr);
-                let pg_conn =
-                    pg::Connection::open(&pg_addr).expect("error when open pg connection.");
+                // let pg_conn =
+                //     pg::Connection::open(&pg_addr).expect("error when open pg connection.");
 
                 let method = Method::Post;
                 let proto_name = msg_obj.proto.to_owned();
@@ -155,7 +157,8 @@ impl Worker {
                 let reqdata = payload.reqdata;
                 let ext: ExtPayload = serde_json::from_slice(&msg_obj.ext)?;
 
-                let mut ef_req = EightFishRequest::new(method, path, reqid, proto_name, reqdata);
+                let mut ef_req =
+                    EightFishRequest::new(method, path, reqid.clone(), Some(proto_name), reqdata);
                 // println!("Worker::work: in post branch: ef_req");
 
                 // insert block_height, block_hash, time, nonce and random_str to req.ext
@@ -230,7 +233,8 @@ impl Worker {
                     // check pass, get content from the tmp cache and write this content to a cache
                     let tmpdata = redis_conn.get(&TMP_CACHE_RESULTS.replace('#', &reqid));
                     if let Ok(Some(ref tmpdata)) = tmpdata {
-                        set_cache_result(&redis_conn, &reqid, tmpdata, "200");
+                        let data_to_cache = String::from_utf8_lossy(tmpdata);
+                        set_cache_result(&redis_conn, &reqid, &data_to_cache, "200");
                     }
                     // delete the tmp cache
                     del_tmp_cache_result(&redis_conn, &reqid);
@@ -251,67 +255,62 @@ impl Worker {
     }
 }
 
-fn store_query_intermedia_result_to_cache<T: EightFishModel + Serialize>(
+fn store_query_intermedia_result_to_cache(
     redis_conn: &redis::Connection,
     reqid: &str,
-    res: &EightFishResponse<T>,
+    res: &EightFishResponse,
 ) {
-    if &Some(ref avec) = res.result() {
+    if let &Some(ref avec) = res.pair_list() {
         if !avec.is_empty() {
-            let data_to_cache = serde_json::to_string(avec)
-                .expect("error when do serde_json serialization.")
+            let data_to_cache = res.result().as_ref().unwrap();
 
             // store to tmp cache, when check_pair_list returns, get it
             set_tmp_cache_result(redis_conn, reqid, data_to_cache);
-        }
-        else {
+        } else {
             let data_to_cache = "[]";
-            set_cache_result(redis_conn, reqid, data_to_cache,  "200");
+            set_cache_result(redis_conn, reqid, data_to_cache, "200");
         }
     } else {
-        if &Some(ref astr) = res.custom_result() {
+        if let &Some(ref astr) = res.custom_result() {
             // return customized string body
             let data_to_cache = astr;
             set_cache_result(redis_conn, reqid, data_to_cache, "200");
-        }
-        else {
+        } else {
             let data_to_cache = "none";
             set_cache_result(redis_conn, reqid, data_to_cache, "200");
         }
     }
 }
 
-fn store_result_to_cache<T: EightFishModel + Serialize>(
-    redis_conn: &redis::Connection,
-    reqid: &str,
-    res: &EightFishResponse<T>,
-) {
-    if &Some(ref avec) = res.result() {
-        let data_to_cache = serde_json::to_string(avec)
-            .expect("error when do serde_json serialization.");
+fn store_result_to_cache(redis_conn: &redis::Connection, reqid: &str, res: &EightFishResponse) {
+    if let &Some(ref _avec) = res.pair_list() {
+        let data_to_cache = res.result().as_ref().unwrap();
         set_cache_result(redis_conn, reqid, &data_to_cache, "200");
     } else {
-        if &Some(ref astr) = res.custom_result() {
+        if let &Some(ref data_to_cache) = res.custom_result() {
             // return customized string body
-            let data_to_cache = astr;
             set_cache_result(redis_conn, reqid, data_to_cache, "200");
-        }
-        else {
+        } else {
             let data_to_cache = "none";
             set_cache_result(redis_conn, reqid, data_to_cache, "200");
         }
     }
 }
 
-
-
-
-fn set_cache_result(redis_conn: &redis::Connection, reqid: &str, data_to_cache: &str, status_code: &str) {
+fn set_cache_result(
+    redis_conn: &redis::Connection,
+    reqid: &str,
+    data_to_cache: &str,
+    status_code: &str,
+) {
     _ = redis_conn.set(
         &CACHE_RESULTS.replace('#', &reqid),
         &data_to_cache.as_bytes().to_vec(),
     );
-    _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &status_code.as_bytes().to_vec());
+    _ = redis_conn.set(
+        &CACHE_STATUS_RESULTS.replace('#', &reqid),
+        &status_code.as_bytes().to_vec(),
+    );
 }
 
 fn set_tmp_cache_result(redis_conn: &redis::Connection, reqid: &str, data_to_cache: &str) {
@@ -325,9 +324,7 @@ fn del_tmp_cache_result(redis_conn: &redis::Connection, reqid: &str) {
     _ = redis_conn.del(&[TMP_CACHE_RESULTS.replace('#', &reqid)]);
 }
 
-
-
-
+#[allow(dead_code)]
 fn update_index_on_write(
     redis_conn: &redis::Connection,
     reqid: &str,
@@ -355,30 +352,29 @@ fn update_index_on_write(
     );
 }
 
-fn check_pair_list_from_vintage<T: EightFishModel + Serialize>(
+fn check_pair_list_from_vintage(
     redis_conn: &redis::Connection,
     reqid: &str,
     proto_name: &str,
-    ef_res: &EightFishResponse<T>,
+    model_name: &str,
+    ef_res: &EightFishResponse,
 ) {
-    let &Some(ref data) = ef_res.result() {
-        if !data.is_empty() {
-            let triple_list = data.map(|&elem| (elem.model_name(), elem.id(), elem.calc_hash())).collect();
-
+    if let &Some(ref pair_list) = ef_res.pair_list() {
+        if !pair_list.is_empty() {
             let payload = json!({
                 "reqid": reqid,
-                "reqdata": Some(triple_list),
+                "reqdata": Some(pair_list),
             });
             println!("check_pair_list_from_vintage: payload: {:?}", payload);
-            
+
             let json_to_send = json!({
                 "proto": proto_name,
-                "model": "",
+                "model": model_name,
                 "action": "check_pair_list",
                 "data": payload.to_string().as_bytes().to_vec(),
                 "ext": Vec::<u8>::new(),
             });
-        
+
             // send this to the redis channel to subxt to query rpc
             _ = redis_conn.publish(
                 CHANNEL_GATE2VIN,
@@ -388,7 +384,7 @@ fn check_pair_list_from_vintage<T: EightFishModel + Serialize>(
     }
 }
 
-fn err_process(err: anyhow::Error, redis_conn: &redis::Connection, reqid: &str) -> Result<()> { 
+fn err_process(err: anyhow::Error, redis_conn: &redis::Connection, reqid: &str) -> Result<()> {
     match err.downcast_ref::<&str>() {
         Some(&"404") => {
             // write not found msg to cache
@@ -396,12 +392,12 @@ fn err_process(err: anyhow::Error, redis_conn: &redis::Connection, reqid: &str) 
             _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"404".to_vec());
         }
         Some(s) => {
-            // 
+            //
             _ = redis_conn.set(&CACHE_RESULTS.replace('#', &reqid), &s.as_bytes().to_vec());
             _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"500".to_vec());
         }
         None => {
-            // 
+            //
             _ = redis_conn.set(
                 &CACHE_RESULTS.replace('#', &reqid),
                 &format!("{}", err).as_bytes().to_vec(),
@@ -416,10 +412,9 @@ fn err_process(err: anyhow::Error, redis_conn: &redis::Connection, reqid: &str) 
 #[macro_export]
 macro_rules! sql_create_one {
     ($instance:expr) => {
-        let pg_addr = std::env::var(DB_URL_ENV).expect("ENV DB_URL_ENV not set.");
+        let pg_addr = std::env::var(DB_URL_ENV).expect("ENV DB_URL not set.");
         // println!("pg_addr: {}", pg_addr);
-        let pg_conn =
-            pg::Connection::open(&pg_addr).expect("error when open pg connection.");
+        let pg_conn = pg::Connection::open(&pg_addr).expect("error when open pg connection.");
 
         let (sql_statement, sql_params) = $instance.build_insert();
         let res = pg_conn.query(&sql_statement, &sql_params)?;
@@ -437,25 +432,32 @@ macro_rules! sql_create_one {
                 match res {
                     Ok(_) => {
                         // recalculate the new instance's id hash pair
-                        let pair_list = vec![(table_name, instance_id, instance_hash)];
-                        
+                        let pair_list = vec![(instance_id, instance_hash)];
+
                         // assume there is always an instance named req in every handler context
                         let reqid = req.id();
                         let proto_name = req.proto();
-                        let redis_addr = std::env::var(REDIS_URL_ENV).expect("ENV REDIS_URL_ENV not set.");
+                        let redis_addr =
+                            std::env::var(REDIS_URL_ENV).expect("ENV REDIS_URL_ENV not set.");
                         // println!("redis_addr: {}", redis_addr);
                         let redis_conn = redis::Connection::open(&redis_addr)
                             .expect("error when open redis connection.");
 
                         // update index to vintage
-                        update_index_on_write(&redis_conn, &reqid, &proto_name, &table_name, &pair_list);
+                        update_index_on_write(
+                            &redis_conn,
+                            &reqid,
+                            &proto_name,
+                            &table_name,
+                            &pair_list,
+                        );
 
                         Ok($instance)
                     }
-                    Err(e) => Err(e)
+                    Err(e) => Err(e),
                 }
             }
-            Err(e) => Err(e)
+            Err(e) => Err(e),
         }
     };
 }
@@ -476,14 +478,14 @@ macro_rules! sql_update_one {
                 let table_name = $instance.model_name();
                 let instance_id = $instance.id();
                 let instance_hash = $instance.calc_hash();
-                let sql_statement = 
+                let sql_statement =
                     format!("update {table_name}_idhash set hash='{instance_hash}' where id='{instance_id}' RETURNING *");
                 let res = pg_conn.query(&sql_statement, &[]);
                 match res {
                     Ok(_) => {
                         // recalculate the new instance's id hash pair
                         let pair_list = vec![(instance_id, instance_hash)];
-                        
+
                         // assume there is always an instance named req in every handler context
                         let reqid = req.id();
                         let proto_name = req.proto();
@@ -528,7 +530,7 @@ macro_rules! sql_update {
                     // update associated idhash table
                     let mut values = vec![];
                     let mut values_str = vec![];
-                    
+
                     // collect affected rows' id and hash
                     for instance in instances {
                         let instance_id = instance.id();
@@ -551,7 +553,7 @@ macro_rules! sql_update {
                             let pair_list = values.into_iter().map(|(id, hash)| {
                                 (id, hash)
                             }).collect();
-                            
+
                             // assume there is always an instance named req in every handler context
                             let reqid = req.id();
                             let proto_name = req.proto();
@@ -582,8 +584,7 @@ macro_rules! sql_delete_one {
     ($instance:expr) => {
         let pg_addr = std::env::var(DB_URL_ENV).expect("ENV DB_URL_ENV not set.");
         // println!("pg_addr: {}", pg_addr);
-        let pg_conn =
-            pg::Connection::open(&pg_addr).expect("error when open pg connection.");
+        let pg_conn = pg::Connection::open(&pg_addr).expect("error when open pg connection.");
 
         let (sql_statement, sql_params) = $instance.build_delete();
         let res = pg_conn.query(&sql_statement, &sql_params)?;
@@ -593,31 +594,41 @@ macro_rules! sql_delete_one {
                 let table_name = $instance.model_name();
                 let instance_id = $instance.id();
                 // let instance_hash = $instance.calc_hash();
-                let sql_statement = format!("delete {}_idhash where id='{}' RETURNING *", table_name, instance_id);
+                let sql_statement = format!(
+                    "delete {}_idhash where id='{}' RETURNING *",
+                    table_name, instance_id
+                );
                 let res = pg_conn.query(&sql_statement, &[]);
                 match res {
                     Ok(_) => {
                         // recalculate the new instance's id hash pair
                         let pair_list = vec![(instance_id, "".to_string())];
-                        
+
                         // assume there is always an instance named req in every handler context
                         let reqid = req.id();
                         let proto_name = req.proto();
 
-                        let redis_addr = std::env::var(REDIS_URL_ENV).expect("ENV REDIS_URL_ENV not set.");
+                        let redis_addr =
+                            std::env::var(REDIS_URL_ENV).expect("ENV REDIS_URL_ENV not set.");
                         // println!("redis_addr: {}", redis_addr);
                         let redis_conn = redis::Connection::open(&redis_addr)
                             .expect("error when open redis connection.");
 
                         // update index to vintage
-                        update_index_on_write(&redis_conn, &reqid, &proto_name, &table_name, &pair_list);
+                        update_index_on_write(
+                            &redis_conn,
+                            &reqid,
+                            &proto_name,
+                            &table_name,
+                            &pair_list,
+                        );
 
                         Ok($instance)
                     }
-                    Err(e) => Err(e)
+                    Err(e) => Err(e),
                 }
             }
-            Err(e) => Err(e)
+            Err(e) => Err(e),
         }
     };
 }
@@ -645,7 +656,7 @@ macro_rules! sql_delete {
                     // update associated idhash table
                     let mut values = vec![];
                     let mut values_str = vec![];
-                    
+
                     // collect affected rows' id and hash
                     for instance in instances {
                         let instance_id = instance.id();
@@ -662,7 +673,7 @@ macro_rules! sql_delete {
                             let pair_list = values.into_iter().map(|(id, _)| {
                                 (id, "".to_string())
                             }).collect();
-                            
+
                             // assume there is always an instance named req in every handler context
                             let reqid = req.id();
                             let proto_name = req.proto();
@@ -694,8 +705,7 @@ macro_rules! sql_query_one {
     ($model: ty, $id: expr) => {
         let pg_addr = std::env::var(DB_URL_ENV).expect("ENV DB_URL_ENV not set.");
         // println!("pg_addr: {}", pg_addr);
-        let pg_conn =
-            pg::Connection::open(&pg_addr).expect("error when open pg connection.");
+        let pg_conn = pg::Connection::open(&pg_addr).expect("error when open pg connection.");
 
         let (sql, sql_params) = $model::build_get_by_id($id);
         let rowset = pg_conn.query(&sql, &sql_params)?;
@@ -733,13 +743,11 @@ macro_rules! sql_query_one {
             }
 
             Some(instance)
-
         } else {
             // error
             // bail!("no this item".to_string());
             None
         };
-
     };
 }
 
@@ -748,8 +756,7 @@ macro_rules! sql_query {
     ($model: ty, $sql_statement: expr, $sql_params: expr) => {
         let pg_addr = std::env::var(DB_URL_ENV).expect("ENV DB_URL_ENV not set.");
         // println!("pg_addr: {}", pg_addr);
-        let pg_conn =
-            pg::Connection::open(&pg_addr).expect("error when open pg connection.");
+        let pg_conn = pg::Connection::open(&pg_addr).expect("error when open pg connection.");
 
         let rowset = pg_conn.query(&sql_statement, &sql_params)?;
 
@@ -761,9 +768,11 @@ macro_rules! sql_query {
 
         if !instances.is_empty() {
             // get ids
-            let ids = instances.map(|&instance| instance.id().to_owned()).collect();
+            let ids = instances
+                .map(|&instance| instance.id().to_owned())
+                .collect();
             let mut ids_str = vec![];
-                
+
             // collect affected rows' id and hash
             for id in ids {
                 ids_str.push(format!("'{}'", id));
@@ -796,11 +805,10 @@ macro_rules! sql_query {
             }
 
             instances
-
         } else {
             // error
             // bail!("no this item".to_string());
             instances
-        };    
+        };
     };
 }

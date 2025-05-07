@@ -52,7 +52,7 @@ impl EightFishRequest {
     }
 
     /// get proto name
-    pub fn proto(&self) -> &String {
+    pub fn proto(&self) -> &Option<String> {
         &self.proto
     }
 

@@ -1,4 +1,4 @@
-use eightfish_derive::{EightFishModel, EightFishDTO, dtocore};
+use eightfish_derive::{dtocore, EightFishDTO, EightFishModel};
 use eightfish_sdk::EightFishModel;
 use serde::{Deserialize, Serialize};
 use spin_sdk::pg::{DbValue, Decode, ParameterValue};
@@ -39,7 +39,7 @@ fn test_get_one_sql() {
 #[test]
 fn test_insert_sql() {
     assert_eq!(
-        "INSERT INTO foo (id, title, content) VALUES ($1, $2, $3);",
+        "INSERT INTO foo (id, title, content) VALUES ($1, $2, $3) RETURNING *;",
         Foo::sql_insert()
     );
 }
@@ -47,13 +47,16 @@ fn test_insert_sql() {
 #[test]
 fn test_update_sql() {
     assert_eq!(
-        "UPDATE foo SET id = $1, title = $2, content = $3 WHERE id = $1;",
+        "UPDATE foo SET id = $1, title = $2, content = $3 WHERE id = $1 RETURNING *;",
         Foo::sql_update()
     );
 }
 #[test]
 fn test_delete_sql() {
-    assert_eq!("DELETE FROM foo WHERE id = $1;", Foo::sql_delete());
+    assert_eq!(
+        "DELETE FROM foo WHERE id = $1 RETURNING *;",
+        Foo::sql_delete()
+    );
 }
 
 #[test]
@@ -123,7 +126,7 @@ fn test_build_insert_sql_and_params() {
     };
     let (statement, params) = f.build_insert();
     assert_eq!(
-        "INSERT INTO foo (id, title, content) VALUES ($1, $2, $3);",
+        "INSERT INTO foo (id, title, content) VALUES ($1, $2, $3) RETURNING *;",
         statement
     );
     assert!(matches!(&params[0], ParameterValue::Str(_id)));
@@ -144,7 +147,7 @@ fn test_build_update_sql_and_params() {
     let (statement, params) = f.build_update();
 
     assert_eq!(
-        "UPDATE foo SET id = $1, title = $2, content = $3 WHERE id = $1;",
+        "UPDATE foo SET id = $1, title = $2, content = $3 WHERE id = $1 RETURNING *;",
         statement
     );
     assert!(matches!(&params[0], ParameterValue::Str(_id)));
@@ -169,7 +172,7 @@ fn test_build_delete_sql_and_params() {
     let id = "id";
     let (statement, params) = Foo::build_delete(id);
 
-    assert_eq!("DELETE FROM foo WHERE id = $1;", statement);
+    assert_eq!("DELETE FROM foo WHERE id = $1 RETURNING *;", statement);
     assert!(matches!(&params[0], ParameterValue::Str(_id)));
 }
 
@@ -235,7 +238,6 @@ fn test_build_struct_from_row() {
     assert_eq!(expected, Foo::from_row(row));
 }
 
-
 #[derive(Default, EightFishModel, PartialEq, Debug, Serialize, Deserialize)]
 struct StructInner {
     id: String, // it's must
@@ -252,10 +254,15 @@ struct StructDTO {
 
 #[test]
 fn test_ef_dto() {
-    let row = vec![DbValue::Str("xxuuid".to_string()), DbValue::Str("1".to_string()), DbValue::Str("test".to_string()), DbValue::Str("extra".to_string())];
+    let row = vec![
+        DbValue::Str("xxuuid".to_string()),
+        DbValue::Str("1".to_string()),
+        DbValue::Str("test".to_string()),
+        DbValue::Str("extra".to_string()),
+    ];
     let dto = StructDTO::from_row(row);
     println!("{:?}", dto);
-    
+
     assert_eq!(dto.inner.id, "xxuuid");
     assert_eq!(dto.inner.a, "1");
     assert_eq!(dto.inner.b, "test");
@@ -264,7 +271,7 @@ fn test_ef_dto() {
 
 #[derive(Default, EightFishModel, PartialEq, Debug, Serialize, Deserialize)]
 struct Inner0 {
-    id: String,  // it's must
+    id: String, // it's must
     a: i32,
     b: String,
 }
@@ -278,10 +285,15 @@ struct DTO00 {
 
 #[test]
 fn test_ef_dto_2() {
-    let row = vec![DbValue::Str("xxuuid".to_string()), DbValue::Int32(1), DbValue::Str("test".to_string()), DbValue::Str("extra".to_string())];
+    let row = vec![
+        DbValue::Str("xxuuid".to_string()),
+        DbValue::Int32(1),
+        DbValue::Str("test".to_string()),
+        DbValue::Str("extra".to_string()),
+    ];
     let dto = DTO00::from_row(row);
     println!("{:?}", dto);
-    
+
     assert_eq!(dto.inner.id, "xxuuid");
     assert_eq!(dto.inner.a, 1);
     assert_eq!(dto.inner.b, "test");
@@ -291,4 +303,3 @@ fn test_ef_dto_2() {
     assert_eq!(dto.inner.id(), "xxuuid");
     assert_eq!(dto.calc_hash(), dto.inner.calc_hash());
 }
-
