@@ -5,7 +5,7 @@ pub enum Method {
     Get,
     Post,
     Put,
-    Delete
+    Delete,
 }
 
 //#[derive(Debug)]
@@ -19,7 +19,13 @@ pub struct EightFishRequest {
 }
 
 impl EightFishRequest {
-    pub fn new(method: Method, path: String, reqid: String, proto: Option<String> data: Option<String>) -> EightFishRequest {
+    pub fn new(
+        method: Method,
+        path: String,
+        reqid: String,
+        proto: Option<String>,
+        data: Option<String>,
+    ) -> EightFishRequest {
         EightFishRequest {
             method,
             path,

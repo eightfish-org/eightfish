@@ -3,9 +3,11 @@ use std::sync::Arc;
 
 pub use crate::handler::EightFishHandler;
 pub use crate::request::EightFishRequest;
+use crate::response::EightFishModel;
 pub use crate::response::EightFishResponse;
 pub use crate::router::EightFishRouter;
 pub use crate::router_m::Router;
+use serde::Serialize;
 
 /// EightFish Error
 // #[derive(Debug, PartialEq, Clone)]
@@ -33,26 +35,29 @@ pub type Result<T> = anyhow::Result<T>;
 /// GlobalFilter trait, used to place global `before` and `after` middlewares
 pub trait GlobalFilter {
     fn before(&self, req: &mut EightFishRequest) -> Result<()>;
-    fn after(&self, req: &EightFishRequest, res: &mut EightFishResponse) -> Result<()>;
+    fn after(&self, req: &EightFishRequest, res: &mut EightFishResponse<T>) -> Result<()>;
 }
 type GlobalFilterType = Box<dyn GlobalFilter + 'static + Send + Sync>;
 type GlobalInitClosure = Box<dyn Fn(&mut EightFishRequest) -> Result<()> + 'static + Send + Sync>;
 
 /// EightFish module trait
 /// 3 methods: before, after, router
-pub trait EightFishModule: Sync + Send {
+pub trait EightFishModule<T>: Sync + Send
+where
+    T: EightFishModel + Serialize,
+{
     /// module before filter, will be executed before handler
     fn before(&self, _req: &mut EightFishRequest) -> Result<()> {
         Ok(())
     }
 
     /// module after filter, will be executed after handler
-    fn after(&self, _req: &EightFishRequest, _res: &mut EightFishResponse) -> Result<()> {
+    fn after(&self, _req: &EightFishRequest, _res: &mut EightFishResponse<T>) -> Result<()> {
         Ok(())
     }
 
     /// module router method, used to write router collection of this module here
-    fn router(&self, router: &mut EightFishRouter) -> Result<()>;
+    fn router(&self, router: &mut EightFishRouter<T>) -> Result<()>;
 }
 
 /// EightFish app struct
@@ -102,7 +107,10 @@ impl EightFishApp {
     }
 
     // add routers of one module to global router
-    pub fn add_module(&mut self, sm: Box<dyn EightFishModule>) -> &mut Self {
+    pub fn add_module<T: EightFishModel + Serialize>(
+        &mut self,
+        sm: Box<dyn EightFishModule<T>>,
+    ) -> &mut Self {
         let mut router = EightFishRouter::new();
         // get the sm router
         sm.router(&mut router).unwrap();
@@ -130,7 +138,7 @@ impl EightFishApp {
                                 global_filter.before(req)?;
                             }
                             sm.before(req)?;
-                            let mut response: EightFishResponse = handler.handle(req)?;
+                            let mut response: EightFishResponse<T> = handler.handle(req)?;
                             sm.after(req, &mut response)?;
                             if let Some(ref global_filter) = global_filter {
                                 global_filter.after(req, &mut response)?;

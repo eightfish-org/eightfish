@@ -1,5 +1,5 @@
-use serde::Serialize;
 use crate::request::Method;
+use serde::Serialize;
 
 /// Response status
 #[derive(Clone, Debug, Copy)]
@@ -29,11 +29,10 @@ impl EightFishModel for DefaultEightFishModel {
     }
 }
 
-
 #[derive(Debug)]
-pub struct EightFishResponse<T = DefaultEightFishModel> 
+pub struct EightFishResponse<T = DefaultEightFishModel>
 where
-    T: EightFishModel + Serialize
+    T: EightFishModel + Serialize,
 {
     status: Status,
     result: Option<Vec<T>>,
@@ -41,10 +40,7 @@ where
 }
 
 impl<T: EightFishModel + Serialize> EightFishResponse<T> {
-    pub fn new(
-        status: Status,
-        result: Vec<T>,
-    ) -> Self {
+    pub fn new(status: Status, result: Vec<T>) -> Self {
         let result = Some(result);
         let custom_result = None;
 
@@ -59,7 +55,7 @@ impl<T: EightFishModel + Serialize> EightFishResponse<T> {
         EightFishResponse {
             status,
             result: None,
-            custom_result: Some(custom_result)
+            custom_result: Some(custom_result),
         }
     }
 
