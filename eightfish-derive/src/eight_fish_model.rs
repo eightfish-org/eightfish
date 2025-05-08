@@ -194,7 +194,8 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
                 param_vec
             }
             /// build both the sql statement and parameters to delete a record with given id
-            pub fn build_delete(id: &str) -> (String, Vec<ParameterValue>) {
+            pub fn build_delete(&self) -> (String, Vec<ParameterValue>) {
+                let id = &self.id();
                 (Self::sql_delete(), Self::params_delete(id))
             }
         }
