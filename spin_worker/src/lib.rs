@@ -95,6 +95,7 @@ impl Worker {
             }
             ACTION_GET => {
                 let redis_addr = std::env::var(REDIS_URL)?;
+                println!("redis_addr: {}", redis_addr);
                 let redis_conn = redis::Connection::open(&redis_addr)
                     .expect("error when open redis connection.");
 
@@ -102,9 +103,12 @@ impl Worker {
                 let proto_name = msg_obj.proto.to_owned();
                 // path info put in the model field from the http_gate
                 let path = msg_obj.model.to_owned();
+                println!("get path: {}", path);
                 let payload: Payload = serde_json::from_slice(&msg_obj.data)?;
                 let reqid = payload.reqid.to_owned();
+                println!("reqid: {}", reqid);
                 let reqdata = payload.reqdata;
+                println!("reqdata: {:?}", reqdata);
 
                 let mut ef_req = EightFishRequest::new(
                     method,
@@ -149,12 +153,22 @@ impl Worker {
                 // let pg_conn =
                 //     pg::Connection::open(&pg_addr).expect("error when open pg connection.");
 
-                let method = Method::Post;
+                let method = match &msg_obj.action[..] {
+                    "post" => Method::Post,
+                    "put" => Method::Put,
+                    "delete" => Method::Delete,
+                    _ => return Err(anyhow::anyhow!("wrong http method.")),
+                };
+                println!("in action write: method: {:?}", method);
                 let proto_name = msg_obj.proto.to_owned();
+                println!("in action write: proto: {:?}", proto_name);
                 let path = msg_obj.model.to_owned();
+                println!("in action write: path: {:?}", path);
                 let payload: Payload = serde_json::from_slice(&msg_obj.data)?;
                 let reqid = payload.reqid.to_owned();
+                println!("in action write: reqid: {:?}", reqid);
                 let reqdata = payload.reqdata;
+                println!("in action write: reqdata: {:?}", reqdata);
                 let ext: ExtPayload = serde_json::from_slice(&msg_obj.ext)?;
 
                 let mut ef_req =
@@ -181,6 +195,7 @@ impl Worker {
                 ef_req
                     .ext_mut()
                     .insert("random_str".to_string(), random_string);
+                println!("in action write: req.ext: {:?}", ef_req.ext());
 
                 let ef_res = self.app.handle(&mut ef_req);
                 match ef_res {
@@ -210,6 +225,10 @@ impl Worker {
                 let payload: Payload = serde_json::from_slice(&msg_obj.data)?;
                 let reqid = payload.reqid.clone();
                 let reqdata = payload.reqdata.unwrap();
+                println!(
+                    "on action check pair list: reqid reqdata: {:?} {:?}",
+                    reqid, reqdata
+                );
 
                 if &reqdata == "true" {
                     // check pass, get content from the tmp cache and write this content to a cache
@@ -339,6 +358,7 @@ fn check_pair_list_from_vintage(
 }
 
 fn err_process(err: anyhow::Error, redis_conn: &redis::Connection, reqid: &str) -> Result<()> {
+    println!("handler error: {:?}", err);
     match err.downcast_ref::<&str>() {
         Some(&"404") => {
             // write not found msg to cache
@@ -456,6 +476,7 @@ macro_rules! sql_update_one {
             pg::Connection::open(&pg_addr).expect("error when open pg connection.");
 
         let (sql_statement, sql_params) = $instance.build_update();
+        println!("in sql_update_one!. sql_statement, sql_params: {:?} {:?}", sql_statement, sql_params);
         let res = pg_conn.query(&sql_statement, &sql_params);
         match res {
             Ok(_) => {
@@ -591,7 +612,7 @@ macro_rules! sql_delete_one {
                 let instance_id = $instance.id();
                 // let instance_hash = $instance.calc_hash();
                 let sql_statement = format!(
-                    "delete {}_idhash where id='{}' RETURNING *",
+                    "DELETE FROM {}_idhash WHERE id='{}' RETURNING *",
                     table_name, instance_id
                 );
                 let res = pg_conn.query(&sql_statement, &[]);
@@ -663,7 +684,7 @@ macro_rules! sql_delete {
                     // construct a sql to update all associated rows in idhash table
                     let values_str = values_str.join(", ");
                     let sql_statement = format!(
-                        "delete {}_idhash where id in ({}) RETURNING *",
+                        "DELETE FROM {}_idhash WHERE id IN ({}) RETURNING *",
                         table_name, values_str
                     );
                     let res = pg_conn.query(&sql_statement, &[]);
