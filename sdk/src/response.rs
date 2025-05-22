@@ -1,4 +1,5 @@
 use serde::Serialize;
+use serde_json::Value;
 
 /// Response status
 #[derive(Clone, Debug, Copy)]
@@ -44,6 +45,17 @@ impl EightFishResponse {
             custom_result,
             model_name,
             pair_list: Some(pair_list),
+        }
+    }
+
+    pub fn from_failed(json_result: Value) -> Self {
+        let jsonstr = json_result.to_string();
+        EightFishResponse {
+            status: Status::Failed,
+            result: None,
+            custom_result: Some(jsonstr),
+            model_name: None,
+            pair_list: None,
         }
     }
 

@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use bytes::Bytes;
 use eightfish_sdk::{
     App as EightFishApp, Handler, Method, Request as EightFishRequest,
-    Response as EightFishResponse,
+    Response as EightFishResponse, Status,
 };
 use serde::Deserialize;
 use serde_json::json;
@@ -122,18 +122,34 @@ impl Worker {
                 let ef_res = self.app.handle(&mut ef_req);
                 match ef_res {
                     Ok(ef_res) => {
-                        store_query_intermedia_result_to_cache(&redis_conn, &reqid, &ef_res);
-
-                        if let &Some(ref avec) = ef_res.pair_list() {
-                            if !avec.is_empty() {
-                                let model_name = ef_res.model_name().as_ref().unwrap();
-                                check_pair_list_from_vintage(
+                        match ef_res.status() {
+                            Status::Successful => {
+                                // process successful status case
+                                // store intermedia data to cache
+                                store_query_intermedia_result_to_cache(
                                     &redis_conn,
                                     &reqid,
-                                    &proto_name,
-                                    model_name,
                                     &ef_res,
                                 );
+
+                                if let &Some(ref avec) = ef_res.pair_list() {
+                                    if !avec.is_empty() {
+                                        let model_name = ef_res.model_name().as_ref().unwrap();
+                                        check_pair_list_from_vintage(
+                                            &redis_conn,
+                                            &reqid,
+                                            &proto_name,
+                                            model_name,
+                                            &ef_res,
+                                        );
+                                    }
+                                }
+                            }
+                            Status::Failed => {
+                                // process failed status case
+                                let data_to_cache =
+                                    ef_res.custom_result().to_owned().unwrap_or_default();
+                                set_cache_result(&redis_conn, &reqid, &data_to_cache, "200");
                             }
                         }
                     }
@@ -200,8 +216,19 @@ impl Worker {
                 let ef_res = self.app.handle(&mut ef_req);
                 match ef_res {
                     Ok(ef_res) => {
-                        // store intermedia data to cache
-                        store_result_to_cache(&redis_conn, &reqid, &ef_res);
+                        match ef_res.status() {
+                            Status::Successful => {
+                                // process successful status case
+                                // store intermedia data to cache
+                                store_result_to_cache(&redis_conn, &reqid, &ef_res);
+                            }
+                            Status::Failed => {
+                                // process failed status case
+                                let data_to_cache =
+                                    ef_res.custom_result().to_owned().unwrap_or_default();
+                                set_cache_result(&redis_conn, &reqid, &data_to_cache, "200");
+                            }
+                        }
                     }
                     Err(err) => {
                         return err_process(err, &redis_conn, &reqid);
@@ -366,12 +393,12 @@ fn err_process(err: anyhow::Error, redis_conn: &redis::Connection, reqid: &str) 
             _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"404".to_vec());
         }
         Some(s) => {
-            //
+            // FIXME: logical error? we must choose a better status code scheme
             _ = redis_conn.set(&CACHE_RESULTS.replace('#', &reqid), &s.as_bytes().to_vec());
             _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"500".to_vec());
         }
         None => {
-            //
+            // other errors
             _ = redis_conn.set(
                 &CACHE_RESULTS.replace('#', &reqid),
                 &format!("{}", err).as_bytes().to_vec(),
