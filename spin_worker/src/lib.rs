@@ -56,7 +56,7 @@ pub struct ExtPayload {
 
 pub struct Worker {
     app: EightFishApp,
-    on_block_height: Option<Box<dyn Fn(u64, String)>>,
+    on_block_height: Option<Box<dyn Fn(u64, String) + Send + Sync + 'static>>,
 }
 
 impl Worker {
@@ -70,12 +70,12 @@ impl Worker {
     // Method to set the closure
     pub fn set_on_block_height<F>(&mut self, closure: F)
     where
-        F: Fn(u64, String) + 'static,
+        F: Fn(u64, String) + Send + Sync + 'static,
     {
         self.on_block_height = Some(Box::new(closure));
     }
 
-    pub fn work(self, message: Bytes) -> Result<()> {
+    pub fn work(&self, message: Bytes) -> Result<()> {
         let msg_obj: InputOutputObject = serde_json::from_slice(&message)?;
         // println!("Worker::work: msg_obj: {:?}", msg_obj);
 
