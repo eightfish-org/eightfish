@@ -40,6 +40,12 @@ pub struct Payload {
 }
 
 #[derive(Deserialize, Debug)]
+pub struct OnBlockHeightPayload {
+    block_height: u64,
+    block_hash: String,
+}
+
+#[derive(Deserialize, Debug)]
 pub struct ExtPayload {
     block_height: u64,
     block_hash: String,
@@ -50,11 +56,23 @@ pub struct ExtPayload {
 
 pub struct Worker {
     app: EightFishApp,
+    on_block_height: Option<Box<dyn Fn(u64, String)>>,
 }
 
 impl Worker {
     pub fn mount(app: EightFishApp) -> Self {
-        Worker { app }
+        Worker {
+            app,
+            on_block_height: None,
+        }
+    }
+
+    // Method to set the closure
+    pub fn set_on_block_height<F>(&mut self, closure: F)
+    where
+        F: Fn(u64, String) + 'static,
+    {
+        self.on_block_height = Some(Box::new(closure));
     }
 
     pub fn work(self, message: Bytes) -> Result<()> {
@@ -64,13 +82,13 @@ impl Worker {
         match &msg_obj.action[..] {
             ACTION_NEW_BLOCK_HEIGHT => {
                 // use msg as a timer, tick on every block height
-                // let body: [u8; 8] = msg_obj.data.try_into().unwrap_or([0; 8]);
-                // convert to u64
-                // let _block_height = u64::from_be_bytes(body);
+                let payload: OnBlockHeightPayload = serde_json::from_slice(&msg_obj.data)?;
 
-                // do something
-                // println!("Block height: {block_height}");
-                // println!("Block hash: {block_hash}");
+                // println!("Block height: {}", payload.block_height);
+                // println!("Block hash: {}", payload.block_hash);
+                if let Some(closure) = &self.on_block_height {
+                    closure(payload.block_height, payload.block_hash);
+                }
             }
             ACTION_UPLOAD_WASM => {
                 // do nothing, wasm_worker itself doesn't care about new wasm file uploaded
