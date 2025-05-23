@@ -72,7 +72,6 @@ impl EightFishRequest {
     }
 
     /// parse urlencoded url or form data
-    // TODO: return a result
     pub fn parse_urlencoded(
         &self,
     ) -> ::std::result::Result<HashMap<String, String>, anyhow::Error> {
@@ -85,6 +84,16 @@ impl EightFishRequest {
                 let val = pair.1.to_string();
                 params.insert(key, val);
             }
+        }
+
+        Ok(params)
+    }
+
+    /// parse json data
+    pub fn parse_json(&self) -> ::std::result::Result<HashMap<String, String>, anyhow::Error> {
+        let mut params: HashMap<String, String> = HashMap::new();
+        if let Some(ref data) = self.data {
+            params = serde_json::from_str(data)?;
         }
 
         Ok(params)
