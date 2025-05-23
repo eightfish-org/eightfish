@@ -1,5 +1,7 @@
+use http::header::{HeaderMap, HeaderName, HeaderValue};
 use serde::Serialize;
 use serde_json::Value;
+// use std::collections::HashMap;
 
 /// Response status
 #[derive(Clone, Debug, Copy)]
@@ -17,6 +19,7 @@ pub trait EightFishModel: Serialize {
 #[derive(Debug)]
 pub struct EightFishResponse {
     status: Status,
+    headers: Option<HeaderMap>,
     result: Option<String>,
     custom_result: Option<String>,
     model_name: Option<String>,
@@ -39,8 +42,15 @@ impl EightFishResponse {
 
         let data = serde_json::to_string(&result).expect("error when do serde_json serialization.");
 
+        let mut headers = HeaderMap::new();
+        let json_header = "application/json"
+            .parse()
+            .expect("str parsing error in Response new.");
+        headers.insert(http::header::CONTENT_TYPE, json_header);
+
         EightFishResponse {
             status,
+            headers: Some(headers),
             result: Some(data),
             custom_result,
             model_name,
@@ -50,8 +60,16 @@ impl EightFishResponse {
 
     pub fn from_failed(json_result: Value) -> Self {
         let jsonstr = json_result.to_string();
+
+        let mut headers = HeaderMap::new();
+        let json_header = "application/json"
+            .parse()
+            .expect("str parsing error in Response from_failed.");
+        headers.insert(http::header::CONTENT_TYPE, json_header);
+
         EightFishResponse {
             status: Status::Failed,
+            headers: Some(headers),
             result: None,
             custom_result: Some(jsonstr),
             model_name: None,
@@ -60,13 +78,28 @@ impl EightFishResponse {
     }
 
     pub fn from_str(status: Status, custom_result: String) -> Self {
+        let mut headers = HeaderMap::new();
+        let json_header = "text/plain"
+            .parse()
+            .expect("str parsing error in Response from_failed.");
+        headers.insert(http::header::CONTENT_TYPE, json_header);
+
         EightFishResponse {
             status,
+            headers: Some(headers),
             result: None,
             custom_result: Some(custom_result),
             model_name: None,
             pair_list: None,
         }
+    }
+
+    pub fn set_header(&mut self, name: HeaderName, value: HeaderValue) {
+        // Get or create HeaderMap
+        let headers = self.headers.get_or_insert_with(HeaderMap::new);
+
+        // Insert the header
+        headers.insert(name, value);
     }
 
     /// get response status
@@ -77,6 +110,16 @@ impl EightFishResponse {
     /// set response status
     pub fn set_status(&mut self, status: Status) {
         self.status = status;
+    }
+
+    /// get response headers
+    pub fn headers(&self) -> &Option<HeaderMap> {
+        &self.headers
+    }
+
+    /// set response status
+    pub fn set_headers(&mut self, headers: Option<HeaderMap>) {
+        self.headers = headers;
     }
 
     /// get response result

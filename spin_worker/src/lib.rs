@@ -4,9 +4,11 @@ use eightfish_sdk::{
     App as EightFishApp, Handler, Method, Request as EightFishRequest,
     Response as EightFishResponse, Status,
 };
+use http::HeaderMap;
 use serde::Deserialize;
 use serde_json::json;
 use spin_sdk::{redis, variables};
+use std::collections::HashMap;
 
 const REDIS_URL: &str = "REDIS_URL";
 const DB_URL: &str = "DB_URL";
@@ -37,6 +39,7 @@ pub struct InputOutputObject {
 pub struct Payload {
     reqid: String,
     reqdata: Option<String>,
+    reqheaders: HashMap<String, String>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -122,16 +125,20 @@ impl Worker {
                 // path info put in the model field from the http_gate
                 let path = msg_obj.model.to_owned();
                 println!("get path: {}", path);
+
                 let payload: Payload = serde_json::from_slice(&msg_obj.data)?;
                 let reqid = payload.reqid.to_owned();
                 println!("reqid: {}", reqid);
                 let reqdata = payload.reqdata;
                 println!("reqdata: {:?}", reqdata);
+                let headers: HeaderMap = (&payload.reqheaders).try_into()?;
+                println!("reqheaders: {:?}", headers);
 
                 let mut ef_req = EightFishRequest::new(
                     method,
                     path,
                     reqid.clone(),
+                    headers,
                     Some(proto_name.clone()),
                     reqdata,
                 );
@@ -203,11 +210,19 @@ impl Worker {
                 println!("in action write: reqid: {:?}", reqid);
                 let reqdata = payload.reqdata;
                 println!("in action write: reqdata: {:?}", reqdata);
+                let headers: HeaderMap = (&payload.reqheaders).try_into()?;
+                println!("reqheaders: {:?}", headers);
+
                 let ext: ExtPayload = serde_json::from_slice(&msg_obj.ext)?;
 
-                let mut ef_req =
-                    EightFishRequest::new(method, path, reqid.clone(), Some(proto_name), reqdata);
-                // println!("Worker::work: in post branch: ef_req");
+                let mut ef_req = EightFishRequest::new(
+                    method,
+                    path,
+                    reqid.clone(),
+                    headers,
+                    Some(proto_name),
+                    reqdata,
+                );
 
                 // insert block_height, block_hash, time, nonce and random_str to req.ext
                 ef_req

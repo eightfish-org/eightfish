@@ -1,3 +1,4 @@
+use http::HeaderMap;
 use std::collections::HashMap;
 
 #[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
@@ -13,6 +14,7 @@ pub struct EightFishRequest {
     method: Method,
     path: String,
     reqid: String,
+    headers: HeaderMap,
     proto: Option<String>,
     data: Option<String>,
     ext: HashMap<String, String>,
@@ -23,6 +25,7 @@ impl EightFishRequest {
         method: Method,
         path: String,
         reqid: String,
+        headers: HeaderMap,
         proto: Option<String>,
         data: Option<String>,
     ) -> EightFishRequest {
@@ -30,6 +33,7 @@ impl EightFishRequest {
             method,
             path,
             reqid,
+            headers,
             proto,
             data,
             ext: HashMap::new(),
@@ -49,6 +53,11 @@ impl EightFishRequest {
     /// get reqid
     pub fn id(&self) -> &String {
         &self.reqid
+    }
+
+    /// get headers
+    pub fn headers(&self) -> &HeaderMap {
+        &self.headers
     }
 
     /// get proto name
