@@ -12,8 +12,8 @@ use std::collections::HashMap;
 
 const REDIS_URL: &str = "REDIS_URL";
 const DB_URL: &str = "DB_URL";
-const TMP_CACHE_RESULTS: &str = "tmp:cache:#";
 const CACHE_STATUS_RESULTS: &str = "cache:status:#";
+const CACHE_HEADERS_RESULTS: &str = "cache:headers:#";
 const CACHE_RESULTS: &str = "cache:#";
 const CHANNEL_GATE2VIN: &str = "gate2vin";
 const ACTION_NEW_BLOCK_HEIGHT: &str = "block_height";
@@ -171,10 +171,12 @@ impl Worker {
                                 }
                             }
                             Status::Failed => {
+                                let headers = ef_res.headers().clone();
                                 // process failed status case
                                 let data_to_cache =
                                     ef_res.custom_result().to_owned().unwrap_or_default();
-                                set_cache_result(&redis_conn, &reqid, &data_to_cache, "200");
+                                set_cache_result(&redis_conn, &reqid, headers, &data_to_cache);
+                                set_cache_status_code(&redis_conn, &reqid, "200");
                             }
                         }
                     }
@@ -256,10 +258,12 @@ impl Worker {
                                 store_result_to_cache(&redis_conn, &reqid, &ef_res);
                             }
                             Status::Failed => {
+                                let headers = ef_res.headers().clone();
                                 // process failed status case
                                 let data_to_cache =
                                     ef_res.custom_result().to_owned().unwrap_or_default();
-                                set_cache_result(&redis_conn, &reqid, &data_to_cache, "200");
+                                set_cache_result(&redis_conn, &reqid, headers, &data_to_cache);
+                                set_cache_status_code(&redis_conn, &reqid, "200");
                             }
                         }
                     }
@@ -292,19 +296,21 @@ impl Worker {
 
                 if &reqdata == "true" {
                     // check pass, get content from the tmp cache and write this content to a cache
-                    let tmpdata = redis_conn.get(&TMP_CACHE_RESULTS.replace('#', &reqid));
-                    if let Ok(Some(ref tmpdata)) = tmpdata {
-                        let data_to_cache = String::from_utf8_lossy(tmpdata);
-                        set_cache_result(&redis_conn, &reqid, &data_to_cache, "200");
-                    }
+                    // let tmpdata = redis_conn.get(&TMP_CACHE_RESULTS.replace('#', &reqid));
+                    // if let Ok(Some(ref tmpdata)) = tmpdata {
+                    // let data_to_cache = String::from_utf8_lossy(tmpdata);
+                    // set_cache_result(&redis_conn, &reqid, &data_to_cache);
+                    set_cache_status_code(&redis_conn, &reqid, "200");
+                    // }
                     // delete the tmp cache
-                    del_tmp_cache_result(&redis_conn, &reqid);
+                    // del_tmp_cache_result(&redis_conn, &reqid);
                 } else {
                     let data = "The result of checking pair list is wrong!";
-                    set_cache_result(&redis_conn, &reqid, data, "400");
+                    set_cache_result(&redis_conn, &reqid, None, data);
+                    set_cache_status_code(&redis_conn, &reqid, "400");
 
                     // clear left tmp cache key
-                    del_tmp_cache_result(&redis_conn, &reqid);
+                    // del_tmp_cache_result(&redis_conn, &reqid);
                 }
             }
             &_ => {
@@ -322,38 +328,47 @@ fn store_query_intermedia_result_to_cache(
     res: &EightFishResponse,
 ) {
     if let &Some(ref avec) = res.pair_list() {
+        let headers = res.headers().clone();
         if !avec.is_empty() {
             let data_to_cache = res.result().as_ref().unwrap();
 
-            // store to tmp cache, when check_pair_list returns, get it
-            set_tmp_cache_result(redis_conn, reqid, data_to_cache);
+            // do not store the status code, when check_pair_list returns, get it
+            set_cache_result(redis_conn, reqid, headers, data_to_cache);
         } else {
             let data_to_cache = "[]";
-            set_cache_result(redis_conn, reqid, data_to_cache, "200");
+            set_cache_result(redis_conn, reqid, headers, data_to_cache);
+            set_cache_status_code(&redis_conn, &reqid, "200");
         }
     } else {
+        let headers = res.headers().clone();
         if let &Some(ref astr) = res.custom_result() {
             // return customized string body
             let data_to_cache = astr;
-            set_cache_result(redis_conn, reqid, data_to_cache, "200");
+            set_cache_result(redis_conn, reqid, headers, data_to_cache);
+            set_cache_status_code(&redis_conn, &reqid, "200");
         } else {
             let data_to_cache = "none";
-            set_cache_result(redis_conn, reqid, data_to_cache, "200");
+            set_cache_result(redis_conn, reqid, headers, data_to_cache);
+            set_cache_status_code(&redis_conn, &reqid, "200");
         }
     }
 }
 
 fn store_result_to_cache(redis_conn: &redis::Connection, reqid: &str, res: &EightFishResponse) {
+    let headers = res.headers().clone();
     if let &Some(ref _avec) = res.pair_list() {
         let data_to_cache = res.result().as_ref().unwrap();
-        set_cache_result(redis_conn, reqid, &data_to_cache, "200");
+        set_cache_result(redis_conn, reqid, headers, &data_to_cache);
+        set_cache_status_code(redis_conn, &reqid, "200");
     } else {
         if let &Some(ref data_to_cache) = res.custom_result() {
             // return customized string body
-            set_cache_result(redis_conn, reqid, data_to_cache, "200");
+            set_cache_result(redis_conn, reqid, headers, data_to_cache);
+            set_cache_status_code(redis_conn, &reqid, "200");
         } else {
             let data_to_cache = "none";
-            set_cache_result(redis_conn, reqid, data_to_cache, "200");
+            set_cache_result(redis_conn, reqid, headers, data_to_cache);
+            set_cache_status_code(redis_conn, &reqid, "200");
         }
     }
 }
@@ -361,28 +376,39 @@ fn store_result_to_cache(redis_conn: &redis::Connection, reqid: &str, res: &Eigh
 fn set_cache_result(
     redis_conn: &redis::Connection,
     reqid: &str,
+    headers: Option<HeaderMap>,
     data_to_cache: &str,
-    status_code: &str,
 ) {
+    if headers.is_none() {
+        _ = redis_conn.set(&CACHE_HEADERS_RESULTS.replace('#', &reqid), &vec![]);
+    } else {
+        let headers_map: HashMap<String, String> = headers
+            .unwrap()
+            .into_iter()
+            .filter_map(|(name, value)| {
+                name.map(|n| {
+                    (
+                        n.as_str().to_string(),
+                        value.to_str().unwrap_or_default().to_string(),
+                    )
+                })
+            })
+            .collect();
+        let headers_vec = serde_json::to_vec(&headers_map).unwrap_or_else(|_| Vec::new());
+
+        _ = redis_conn.set(&CACHE_HEADERS_RESULTS.replace('#', &reqid), &headers_vec);
+    }
     _ = redis_conn.set(
         &CACHE_RESULTS.replace('#', &reqid),
         &data_to_cache.as_bytes().to_vec(),
     );
+}
+
+fn set_cache_status_code(redis_conn: &redis::Connection, reqid: &str, status_code: &str) {
     _ = redis_conn.set(
         &CACHE_STATUS_RESULTS.replace('#', &reqid),
         &status_code.as_bytes().to_vec(),
     );
-}
-
-fn set_tmp_cache_result(redis_conn: &redis::Connection, reqid: &str, data_to_cache: &str) {
-    _ = redis_conn.set(
-        &TMP_CACHE_RESULTS.replace('#', reqid),
-        &data_to_cache.as_bytes().to_vec(),
-    );
-}
-
-fn del_tmp_cache_result(redis_conn: &redis::Connection, reqid: &str) {
-    _ = redis_conn.del(&[TMP_CACHE_RESULTS.replace('#', &reqid)]);
 }
 
 fn check_pair_list_from_vintage(
