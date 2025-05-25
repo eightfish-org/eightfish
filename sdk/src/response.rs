@@ -27,7 +27,7 @@ pub struct EightFishResponse {
 }
 
 impl EightFishResponse {
-    pub fn new<T: EightFishModel + Serialize>(status: Status, result: Vec<T>) -> Self {
+    pub fn new_check<T: EightFishModel + Serialize>(status: Status, result: Vec<T>) -> Self {
         let custom_result = None;
 
         let model_name = if result.is_empty() {
@@ -58,7 +58,7 @@ impl EightFishResponse {
         }
     }
 
-    pub fn from_failed(json_result: Value) -> Self {
+    pub fn new_uncheck(status: Status, json_result: Value) -> Self {
         let jsonstr = json_result.to_string();
 
         let mut headers = HeaderMap::new();
@@ -68,7 +68,7 @@ impl EightFishResponse {
         headers.insert(http::header::CONTENT_TYPE, json_header);
 
         EightFishResponse {
-            status: Status::Failed,
+            status,
             headers: Some(headers),
             result: None,
             custom_result: Some(jsonstr),
@@ -77,7 +77,7 @@ impl EightFishResponse {
         }
     }
 
-    pub fn from_str(status: Status, custom_result: String) -> Self {
+    pub fn from_str_uncheck(status: Status, custom_result: String) -> Self {
         let mut headers = HeaderMap::new();
         let json_header = "text/plain"
             .parse()
