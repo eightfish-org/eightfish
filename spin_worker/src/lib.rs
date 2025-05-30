@@ -231,13 +231,13 @@ impl Worker {
                     .ext_mut()
                     .insert("block_height".to_string(), ext.block_height.to_string());
                 // encode the hex digitals as base58 string
-                let block_hash_str = bs58::encode(&ext.block_hash).into_string();
+                // let block_hash_str = bs58::encode(&ext.block_hash).into_string();
                 ef_req
                     .ext_mut()
-                    .insert("block_hash".to_string(), block_hash_str);
+                    .insert("block_hash".to_string(), ext.block_hash);
                 ef_req
                     .ext_mut()
-                    .insert("time".to_string(), ext.time.to_string());
+                    .insert("timestamp".to_string(), ext.time.to_string());
                 ef_req
                     .ext_mut()
                     .insert("nonce".to_string(), ext.nonce.to_string());
@@ -608,7 +608,10 @@ macro_rules! sql_update {
         // println!("pg_addr: {}", pg_addr);
         let pg_conn = pg::Connection::open(&pg_addr).expect("error when open pg connection.");
 
-        let res = pg_conn.query($sql_statement, $sql_params);
+        let sql_str = spin_worker::append_returning_star($sql_statement);
+        println!("in sql_update, sql str: {}", sql_str);
+
+        let res = pg_conn.query(&sql_str, $sql_params);
         match res {
             Ok(rowset) => {
                 let mut instances = vec![];
@@ -744,7 +747,10 @@ macro_rules! sql_delete {
         // println!("pg_addr: {}", pg_addr);
         let pg_conn = pg::Connection::open(&pg_addr).expect("error when open pg connection.");
 
-        let res = pg_conn.query($sql_statement, $sql_params);
+        let sql_str = spin_worker::append_returning_star($sql_statement);
+        println!("in sql_delete, sql str: {}", sql_str);
+
+        let res = pg_conn.query(&sql_str, $sql_params);
         match res {
             Ok(rowset) => {
                 let mut instances = vec![];
@@ -935,4 +941,13 @@ macro_rules! sql_query {
             vec![]
         }
     }};
+}
+
+pub fn append_returning_star(sql: &str) -> String {
+    let trimmed = sql.trim();
+    if trimmed.to_uppercase().ends_with("RETURNING *") {
+        trimmed.to_string()
+    } else {
+        format!("{} RETURNING *", trimmed)
+    }
 }
