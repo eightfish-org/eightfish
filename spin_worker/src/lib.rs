@@ -7,7 +7,10 @@ use eightfish_sdk::{
 use http::HeaderMap;
 use serde::Deserialize;
 use serde_json::json;
-use spin_sdk::{redis, variables};
+use spin_sdk::{
+    redis::{self, RedisParameter, RedisResult},
+    variables,
+};
 use std::collections::HashMap;
 
 const REDIS_URL: &str = "REDIS_URL";
@@ -15,6 +18,8 @@ const DB_URL: &str = "DB_URL";
 const CACHE_STATUS_RESULTS: &str = "cache:status:#";
 const CACHE_HEADERS_RESULTS: &str = "cache:headers:#";
 const CACHE_RESULTS: &str = "cache:#";
+const CACHE_STACKCOUNT: &str = "cache:stackcount:#";
+const CACHE_PAIRLIST: &str = "cache:pairlist:#";
 const CHANNEL_GATE2VIN: &str = "gate2vin";
 const ACTION_NEW_BLOCK_HEIGHT: &str = "block_height";
 const ACTION_UPLOAD_WASM: &str = "upload_wasm";
@@ -151,11 +156,7 @@ impl Worker {
                             Status::Successful => {
                                 // process successful status case
                                 // store intermedia data to cache
-                                store_query_intermedia_result_to_cache(
-                                    &redis_conn,
-                                    &reqid,
-                                    &ef_res,
-                                );
+                                store_result_to_cache(&redis_conn, &reqid, &ef_res);
 
                                 if let &Some(ref avec) = ef_res.pair_list() {
                                     if !avec.is_empty() {
@@ -165,7 +166,7 @@ impl Worker {
                                             &reqid,
                                             &proto_name,
                                             model_name,
-                                            &ef_res,
+                                            avec,
                                         );
                                     }
                                 }
@@ -222,7 +223,7 @@ impl Worker {
                     path,
                     reqid.clone(),
                     headers,
-                    Some(proto_name),
+                    Some(proto_name.clone()),
                     reqdata,
                 );
 
@@ -256,6 +257,16 @@ impl Worker {
                                 // process successful status case
                                 // store intermedia data to cache
                                 store_result_to_cache(&redis_conn, &reqid, &ef_res);
+
+                                if let &Some(ref avec) = ef_res.pair_list() {
+                                    if !avec.is_empty() {
+                                        // set pair_list to a cache
+                                        let key = CACHE_PAIRLIST.replace('#', &reqid);
+                                        let val = serde_json::to_vec(avec)
+                                            .expect("error when serialize pair list");
+                                        _ = redis_conn.set(&key, &val);
+                                    }
+                                }
                             }
                             Status::Failed => {
                                 let headers = ef_res.headers().clone();
@@ -277,6 +288,53 @@ impl Worker {
                 let payload: Payload = serde_json::from_slice(&msg_obj.data)?;
                 println!("callback: update_index: payload: {:?}", payload);
 
+                let reqid = payload.reqid;
+
+                let redis_addr = std::env::var(REDIS_URL)?;
+                let redis_conn = redis::Connection::open(&redis_addr)
+                    .expect("error when open redis connection.");
+
+                // for any write action, we seem them the same, and
+                // decrease the stack count on each event of them arrives
+                let key0 = CACHE_STACKCOUNT.replace("#", &reqid);
+                let param1 = RedisParameter::Binary(key0.as_bytes().to_vec());
+                let avec: Vec<i64> = redis_conn
+                    .execute("decr", &[param1])?
+                    .into_iter()
+                    .map(|res| match res {
+                        RedisResult::Int64(result) => result,
+                        _ => -1,
+                    })
+                    .collect();
+                if !avec.is_empty() {
+                    let result = avec[0];
+                    // when the stack count reaches 0, it says all indexes have been
+                    // updated to the vintage
+                    if result == 0 {
+                        // for write case, we also need to check pair list for result
+                        let key1 = CACHE_PAIRLIST.replace('#', &reqid);
+                        if let Some(avec) = redis_conn.get(&key1)? {
+                            let pair_list: Vec<(String, String)> = serde_json::from_slice(&avec)?;
+                            if !pair_list.is_empty() {
+                                check_pair_list_from_vintage(
+                                    &redis_conn,
+                                    &reqid,
+                                    &msg_obj.proto,
+                                    &msg_obj.model,
+                                    &pair_list,
+                                );
+                            }
+                        }
+                        // clear the pair list cache
+                        // _ = redis_conn.del(&[key1]);
+                        // clear the stack count key
+                        _ = redis_conn.del(&[key0, key1]);
+                    }
+                } else {
+                    // do nothing
+                    _ = redis_conn.del(&[key0]);
+                }
+
                 // TODO: we need handle the error case when vintage throws erros
                 // put it in the future version
             }
@@ -287,30 +345,20 @@ impl Worker {
 
                 // handle the result of the check_pair_list
                 let payload: Payload = serde_json::from_slice(&msg_obj.data)?;
-                let reqid = payload.reqid.clone();
-                let reqdata = payload.reqdata.unwrap();
+                let reqid = payload.reqid;
+                let reqdata = payload.reqdata.unwrap_or_default();
                 println!(
                     "on action check pair list: reqid reqdata: {:?} {:?}",
                     reqid, reqdata
                 );
 
                 if &reqdata == "true" {
-                    // check pass, get content from the tmp cache and write this content to a cache
-                    // let tmpdata = redis_conn.get(&TMP_CACHE_RESULTS.replace('#', &reqid));
-                    // if let Ok(Some(ref tmpdata)) = tmpdata {
-                    // let data_to_cache = String::from_utf8_lossy(tmpdata);
-                    // set_cache_result(&redis_conn, &reqid, &data_to_cache);
+                    // set cache status to make response data ready
                     set_cache_status_code(&redis_conn, &reqid, "200");
-                    // }
-                    // delete the tmp cache
-                    // del_tmp_cache_result(&redis_conn, &reqid);
                 } else {
-                    let data = "The result of checking pair list is wrong!";
+                    let data = "Checking pair list failed, abort the response!";
                     set_cache_result(&redis_conn, &reqid, None, data);
                     set_cache_status_code(&redis_conn, &reqid, "400");
-
-                    // clear left tmp cache key
-                    // del_tmp_cache_result(&redis_conn, &reqid);
                 }
             }
             &_ => {
@@ -322,25 +370,22 @@ impl Worker {
     }
 }
 
-fn store_query_intermedia_result_to_cache(
-    redis_conn: &redis::Connection,
-    reqid: &str,
-    res: &EightFishResponse,
-) {
+fn store_result_to_cache(redis_conn: &redis::Connection, reqid: &str, res: &EightFishResponse) {
+    let headers = res.headers().clone();
     if let &Some(ref avec) = res.pair_list() {
-        let headers = res.headers().clone();
         if !avec.is_empty() {
             let data_to_cache = res.result().as_ref().unwrap();
 
-            // do not store the status code, when check_pair_list returns, get it
+            // here we do not set the status code, when check_pair_list returns, get it
             set_cache_result(redis_conn, reqid, headers, data_to_cache);
         } else {
+            // if data array to return is an empty vector, return it immediately
             let data_to_cache = "[]";
             set_cache_result(redis_conn, reqid, headers, data_to_cache);
             set_cache_status_code(&redis_conn, &reqid, "200");
         }
     } else {
-        let headers = res.headers().clone();
+        // for the custom result, return it immediately
         if let &Some(ref astr) = res.custom_result() {
             // return customized string body
             let data_to_cache = astr;
@@ -350,25 +395,6 @@ fn store_query_intermedia_result_to_cache(
             let data_to_cache = "none";
             set_cache_result(redis_conn, reqid, headers, data_to_cache);
             set_cache_status_code(&redis_conn, &reqid, "200");
-        }
-    }
-}
-
-fn store_result_to_cache(redis_conn: &redis::Connection, reqid: &str, res: &EightFishResponse) {
-    let headers = res.headers().clone();
-    if let &Some(ref _avec) = res.pair_list() {
-        let data_to_cache = res.result().as_ref().unwrap();
-        set_cache_result(redis_conn, reqid, headers, &data_to_cache);
-        set_cache_status_code(redis_conn, &reqid, "200");
-    } else {
-        if let &Some(ref data_to_cache) = res.custom_result() {
-            // return customized string body
-            set_cache_result(redis_conn, reqid, headers, data_to_cache);
-            set_cache_status_code(redis_conn, &reqid, "200");
-        } else {
-            let data_to_cache = "none";
-            set_cache_result(redis_conn, reqid, headers, data_to_cache);
-            set_cache_status_code(redis_conn, &reqid, "200");
         }
     }
 }
@@ -416,31 +442,27 @@ fn check_pair_list_from_vintage(
     reqid: &str,
     proto_name: &str,
     model_name: &str,
-    ef_res: &EightFishResponse,
+    pair_list: &Vec<(String, String)>,
 ) {
-    if let &Some(ref pair_list) = ef_res.pair_list() {
-        if !pair_list.is_empty() {
-            let payload = json!({
-                "reqid": reqid,
-                "reqdata": Some(pair_list),
-            });
-            println!("check_pair_list_from_vintage: payload: {:?}", payload);
+    let payload = json!({
+        "reqid": reqid,
+        "reqdata": Some(pair_list),
+    });
+    println!("check_pair_list_from_vintage: payload: {:?}", payload);
 
-            let json_to_send = json!({
-                "proto": proto_name,
-                "model": model_name,
-                "action": "check_pair_list",
-                "data": payload.to_string().as_bytes().to_vec(),
-                "ext": Vec::<u8>::new(),
-            });
+    let json_to_send = json!({
+        "proto": proto_name,
+        "model": model_name,
+        "action": "check_pair_list",
+        "data": payload.to_string().as_bytes().to_vec(),
+        "ext": Vec::<u8>::new(),
+    });
 
-            // send this to the redis channel to subxt to query rpc
-            _ = redis_conn.publish(
-                CHANNEL_GATE2VIN,
-                &json_to_send.to_string().as_bytes().to_vec(),
-            );
-        }
-    }
+    // send this to the redis channel to subxt to query rpc
+    _ = redis_conn.publish(
+        CHANNEL_GATE2VIN,
+        &json_to_send.to_string().as_bytes().to_vec(),
+    );
 }
 
 fn err_process(err: anyhow::Error, redis_conn: &redis::Connection, reqid: &str) -> Result<()> {
@@ -495,6 +517,9 @@ pub fn update_index_on_write(
         CHANNEL_GATE2VIN,
         &json_to_send.to_string().as_bytes().to_vec(),
     );
+
+    // increase write stack count
+    _ = redis_conn.incr(&CACHE_STACKCOUNT.replace('#', reqid));
 }
 
 #[allow(dead_code)]
