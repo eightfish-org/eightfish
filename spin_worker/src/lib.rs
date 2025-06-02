@@ -548,6 +548,7 @@ macro_rules! sql_create_one {
                 let instance_hash = $instance.calc_hash();
                 let pair_list = vec![(instance_id, instance_hash)];
 
+                let table_name = $instance.model_name();
                 let reqid = $req.id();
                 let proto_name = $req.proto().to_owned().unwrap_or_default();
                 let redis_addr = std::env::var(REDIS_URL).expect("ENV REDIS_URLnot set.");
@@ -591,6 +592,7 @@ macro_rules! sql_update_one {
                 // recalculate the new instance's id hash pair
                 let pair_list = vec![(instance_id, instance_hash)];
 
+                let table_name = $instance.model_name();
                 let reqid = $req.id();
                 let proto_name = $req.proto().to_owned().unwrap();
                 let redis_addr = std::env::var(REDIS_URL).expect("ENV REDIS_URL not set.");
@@ -643,6 +645,7 @@ macro_rules! sql_update {
                         pair_list.push((instance_id, instance_hash));
                     }
 
+                    let table_name = <$model>::model_name();
                     let reqid = $req.id();
                     let proto_name = $req.proto().to_owned().unwrap();
                     let redis_addr = std::env::var(REDIS_URL).expect("ENV REDIS_URL not set.");
@@ -683,6 +686,7 @@ macro_rules! sql_delete_one {
                 // recalculate the new instance's id hash pair
                 let pair_list = vec![(instance_id, "".to_string())];
 
+                let table_name = $instance.model_name();
                 let reqid = $req.id();
                 let proto_name = $req.proto().to_owned().unwrap();
 
@@ -775,7 +779,6 @@ macro_rules! sql_query_one {
         let (sql, sql_params) = <$model>::build_get_by_id($id);
         let rowset = pg_conn.query(&sql, &sql_params)?;
 
-        let table_name = <$model>::model_name();
         if let Some(row) = rowset.rows.into_iter().next() {
             let instance = <$model>::from_row(row);
 
