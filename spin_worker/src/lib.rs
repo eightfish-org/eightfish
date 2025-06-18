@@ -155,11 +155,11 @@ impl Worker {
                         match ef_res.status_code() {
                             StatusCode::OK => {
                                 // process successful status case
-                                // store intermedia data to cache
                                 store_result_to_cache(&redis_conn, &reqid, &ef_res);
 
                                 if let &Some(ref avec) = ef_res.pair_list() {
                                     if !avec.is_empty() {
+                                        // if to-be-validated data is a non-empty vector
                                         let model_name = ef_res.model_name().as_ref().unwrap();
                                         check_pair_list_from_vintage(
                                             &redis_conn,
@@ -393,9 +393,11 @@ fn store_result_to_cache(redis_conn: &redis::Connection, reqid: &str, res: &Eigh
             set_cache_result(redis_conn, reqid, headers, data_to_cache);
         } else {
             // if data array to return is an empty vector, return it immediately
+            // [] is a valid json empty array.
             let data_to_cache = "[]";
             set_cache_result(redis_conn, reqid, headers, data_to_cache);
-            set_cache_status_code(&redis_conn, &reqid, "200");
+            let status_code = StatusCode::OK.as_u16().to_string();
+            set_cache_status_code(&redis_conn, &reqid, &status_code);
         }
     } else {
         // for the custom result, return it immediately
@@ -403,11 +405,13 @@ fn store_result_to_cache(redis_conn: &redis::Connection, reqid: &str, res: &Eigh
             // return customized string body
             let data_to_cache = astr;
             set_cache_result(redis_conn, reqid, headers, data_to_cache);
-            set_cache_status_code(&redis_conn, &reqid, "200");
+            let status_code = StatusCode::OK.as_u16().to_string();
+            set_cache_status_code(&redis_conn, &reqid, &status_code);
         } else {
-            let data_to_cache = "none";
+            let data_to_cache = "<no content>";
             set_cache_result(redis_conn, reqid, headers, data_to_cache);
-            set_cache_status_code(&redis_conn, &reqid, "200");
+            let status_code = StatusCode::OK.as_u16().to_string();
+            set_cache_status_code(&redis_conn, &reqid, &status_code);
         }
     }
 }

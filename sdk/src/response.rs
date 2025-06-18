@@ -28,7 +28,7 @@ pub struct EightFishResponse {
 }
 
 impl EightFishResponse {
-    pub fn new_check<T: EightFishModel + Serialize>(status: StatusCode, result: Vec<T>) -> Self {
+    pub fn new_check<T: EightFishModel + Serialize>(result: Vec<T>) -> Self {
         let custom_result = None;
 
         let model_name = if result.is_empty() {
@@ -50,7 +50,7 @@ impl EightFishResponse {
         headers.insert(http::header::CONTENT_TYPE, json_header);
 
         EightFishResponse {
-            status,
+            status: StatusCode::OK,
             headers: Some(headers),
             result: Some(data),
             custom_result,
