@@ -3,12 +3,13 @@ use serde::Serialize;
 use serde_json::Value;
 // use std::collections::HashMap;
 
-/// Response status
-#[derive(Clone, Debug, Copy)]
-pub enum Status {
-    Successful,
-    Failed,
-}
+use http::status::StatusCode;
+// /// Response status
+// #[derive(Clone, Debug, Copy)]
+// pub enum Status {
+//     Successful,
+//     Failed,
+// }
 
 pub trait EightFishModel: Serialize {
     fn model_name(&self) -> String;
@@ -18,7 +19,7 @@ pub trait EightFishModel: Serialize {
 
 #[derive(Debug)]
 pub struct EightFishResponse {
-    status: Status,
+    status: StatusCode,
     headers: Option<HeaderMap>,
     result: Option<String>,
     custom_result: Option<String>,
@@ -27,7 +28,7 @@ pub struct EightFishResponse {
 }
 
 impl EightFishResponse {
-    pub fn new_check<T: EightFishModel + Serialize>(status: Status, result: Vec<T>) -> Self {
+    pub fn new_check<T: EightFishModel + Serialize>(status: StatusCode, result: Vec<T>) -> Self {
         let custom_result = None;
 
         let model_name = if result.is_empty() {
@@ -58,7 +59,7 @@ impl EightFishResponse {
         }
     }
 
-    pub fn new_uncheck(status: Status, json_result: Value) -> Self {
+    pub fn new_uncheck(status: StatusCode, json_result: Value) -> Self {
         let jsonstr = json_result.to_string();
 
         let mut headers = HeaderMap::new();
@@ -77,7 +78,7 @@ impl EightFishResponse {
         }
     }
 
-    pub fn from_str_uncheck(status: Status, custom_result: String) -> Self {
+    pub fn from_str_uncheck(status: StatusCode, custom_result: String) -> Self {
         let mut headers = HeaderMap::new();
         let json_header = "text/plain"
             .parse()
@@ -103,12 +104,12 @@ impl EightFishResponse {
     }
 
     /// get response status
-    pub fn status(&self) -> Status {
+    pub fn status_code(&self) -> StatusCode {
         self.status
     }
 
     /// set response status
-    pub fn set_status(&mut self, status: Status) {
+    pub fn set_status_code(&mut self, status: StatusCode) {
         self.status = status;
     }
 

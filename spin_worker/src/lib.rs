@@ -2,9 +2,9 @@ use anyhow::{anyhow, Result};
 use bytes::Bytes;
 use eightfish_sdk::{
     App as EightFishApp, Handler, Method, Request as EightFishRequest,
-    Response as EightFishResponse, Status,
+    Response as EightFishResponse,
 };
-use http::HeaderMap;
+use http::{HeaderMap, StatusCode};
 use serde::Deserialize;
 use serde_json::json;
 use spin_sdk::{
@@ -152,8 +152,8 @@ impl Worker {
                 let ef_res = self.app.handle(&mut ef_req);
                 match ef_res {
                     Ok(ef_res) => {
-                        match ef_res.status() {
-                            Status::Successful => {
+                        match ef_res.status_code() {
+                            StatusCode::OK => {
                                 // process successful status case
                                 // store intermedia data to cache
                                 store_result_to_cache(&redis_conn, &reqid, &ef_res);
@@ -171,13 +171,18 @@ impl Worker {
                                     }
                                 }
                             }
-                            Status::Failed => {
+                            _ => {
                                 let headers = ef_res.headers().clone();
                                 // process failed status case
                                 let data_to_cache =
                                     ef_res.custom_result().to_owned().unwrap_or_default();
                                 set_cache_result(&redis_conn, &reqid, headers, &data_to_cache);
-                                set_cache_status_code(&redis_conn, &reqid, "200");
+                                let status_code: u16 = ef_res.status_code().into();
+                                set_cache_status_code(
+                                    &redis_conn,
+                                    &reqid,
+                                    &status_code.to_string(),
+                                );
                             }
                         }
                     }
@@ -252,8 +257,8 @@ impl Worker {
                 let ef_res = self.app.handle(&mut ef_req);
                 match ef_res {
                     Ok(ef_res) => {
-                        match ef_res.status() {
-                            Status::Successful => {
+                        match ef_res.status_code() {
+                            StatusCode::OK => {
                                 // process successful status case
                                 // store intermedia data to cache
                                 store_result_to_cache(&redis_conn, &reqid, &ef_res);
@@ -268,13 +273,18 @@ impl Worker {
                                     }
                                 }
                             }
-                            Status::Failed => {
+                            _ => {
                                 let headers = ef_res.headers().clone();
                                 // process failed status case
                                 let data_to_cache =
                                     ef_res.custom_result().to_owned().unwrap_or_default();
                                 set_cache_result(&redis_conn, &reqid, headers, &data_to_cache);
-                                set_cache_status_code(&redis_conn, &reqid, "200");
+                                let status_code: u16 = ef_res.status_code().into();
+                                set_cache_status_code(
+                                    &redis_conn,
+                                    &reqid,
+                                    &status_code.to_string(),
+                                );
                             }
                         }
                     }
@@ -353,12 +363,15 @@ impl Worker {
                 );
 
                 if &reqdata == "true" {
+                    let status_code = StatusCode::OK.as_u16();
+
                     // set cache status to make response data ready
-                    set_cache_status_code(&redis_conn, &reqid, "200");
+                    set_cache_status_code(&redis_conn, &reqid, &status_code.to_string());
                 } else {
                     let data = "Checking pair list failed, abort the response!";
                     set_cache_result(&redis_conn, &reqid, None, data);
-                    set_cache_status_code(&redis_conn, &reqid, "400");
+                    let status_code = StatusCode::INTERNAL_SERVER_ERROR.as_u16();
+                    set_cache_status_code(&redis_conn, &reqid, &status_code.to_string());
                 }
             }
             &_ => {

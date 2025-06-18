@@ -170,7 +170,14 @@ fn test_build_get_one_sql_and_params() {
 #[test]
 fn test_build_delete_sql_and_params() {
     let id = "id";
-    let (statement, params) = Foo::build_delete(id);
+    let title = "my blog";
+    let content = "blog content";
+    let f = Foo {
+        id: id.to_string(),
+        title: title.to_string(),
+        content: content.to_string(),
+    };
+    let (statement, params) = f.build_delete();
 
     assert_eq!("DELETE FROM foo WHERE id = $1 RETURNING *;", statement);
     assert!(matches!(&params[0], ParameterValue::Str(_id)));
