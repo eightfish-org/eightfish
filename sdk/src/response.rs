@@ -3,7 +3,7 @@ use serde::Serialize;
 use serde_json::Value;
 // use std::collections::HashMap;
 
-use http::status::StatusCode;
+pub use http::status::StatusCode;
 // /// Response status
 // #[derive(Clone, Debug, Copy)]
 // pub enum Status {
