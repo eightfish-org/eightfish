@@ -267,8 +267,15 @@ impl Worker {
                                     if !avec.is_empty() {
                                         // set pair_list to a cache
                                         let key = CACHE_PAIRLIST.replace('#', &reqid);
-                                        let val = serde_json::to_vec(avec)
-                                            .expect("error when serialize pair list");
+                                        let val = if msg_obj.action == ACTION_DELETE {
+                                            let avec: Vec<(String, String)> = avec
+                                                .iter()
+                                                .map(|(id, _hash)| (id.to_owned(), "".to_string()))
+                                                .collect();
+                                            serde_json::to_vec(&avec)?
+                                        } else {
+                                            serde_json::to_vec(avec)?
+                                        };
                                         _ = redis_conn.set(&key, &val);
                                     }
                                 }
@@ -295,6 +302,7 @@ impl Worker {
             }
             ACTION_UPDATE_INDEX => {
                 // Callback: handle the result of the update_index call event
+                // println!("callback: update_index: start. {:?}", msg_obj);
                 let payload: Payload = serde_json::from_slice(&msg_obj.data)?;
                 println!("callback: update_index: payload: {:?}", payload);
 
@@ -316,6 +324,7 @@ impl Worker {
                         _ => -1,
                     })
                     .collect();
+                println!("callback: update_index: decr count: {:?}", avec);
                 if !avec.is_empty() {
                     let result = avec[0];
                     // when the stack count reaches 0, it says all indexes have been
@@ -335,8 +344,6 @@ impl Worker {
                                 );
                             }
                         }
-                        // clear the pair list cache
-                        // _ = redis_conn.del(&[key1]);
                         // clear the stack count key
                         _ = redis_conn.del(&[key0, key1]);
                     }
@@ -423,7 +430,7 @@ fn set_cache_result(
     data_to_cache: &str,
 ) {
     if headers.is_none() {
-        _ = redis_conn.set(&CACHE_HEADERS_RESULTS.replace('#', &reqid), &vec![]);
+        _ = redis_conn.set(&CACHE_HEADERS_RESULTS.replace('#', &reqid), &b"{}".to_vec());
     } else {
         let headers_map: HashMap<String, String> = headers
             .unwrap()
@@ -488,12 +495,14 @@ fn err_process(err: anyhow::Error, redis_conn: &redis::Connection, reqid: &str) 
         Some(&"404") => {
             // write not found msg to cache
             _ = redis_conn.set(&CACHE_RESULTS.replace('#', &reqid), &b"Not Found".to_vec());
+            _ = redis_conn.set(&CACHE_HEADERS_RESULTS.replace('#', &reqid), &b"{}".to_vec());
             _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"404".to_vec());
         }
         Some(s) => {
             // FIXME: logical error? we must choose a better status code scheme
             _ = redis_conn.set(&CACHE_RESULTS.replace('#', &reqid), &s.as_bytes().to_vec());
-            _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"500".to_vec());
+            _ = redis_conn.set(&CACHE_HEADERS_RESULTS.replace('#', &reqid), &b"{}".to_vec());
+            _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"400".to_vec());
         }
         None => {
             // other errors
@@ -501,6 +510,7 @@ fn err_process(err: anyhow::Error, redis_conn: &redis::Connection, reqid: &str) 
                 &CACHE_RESULTS.replace('#', &reqid),
                 &format!("{}", err).as_bytes().to_vec(),
             );
+            _ = redis_conn.set(&CACHE_HEADERS_RESULTS.replace('#', &reqid), &b"{}".to_vec());
             _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"500".to_vec());
         }
     }
@@ -701,7 +711,7 @@ macro_rules! sql_delete_one {
         match res {
             Ok(_) => {
                 // recalculate the new instance's id hash pair
-                let pair_list = vec![(instance_id, "".to_string())];
+                let pair_list = vec![($instance.id(), "".to_string())];
 
                 let table_name = $instance.model_name();
                 let reqid = $req.id();
