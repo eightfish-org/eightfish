@@ -1,6 +1,6 @@
 use http::HeaderMap;
-use std::collections::HashMap;
 use serde::de::DeserializeOwned;
+use std::collections::HashMap;
 
 #[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
 pub enum Method {
@@ -99,16 +99,10 @@ impl EightFishRequest {
         Ok(params)
     }
 
-    /// parse json data
-    pub fn parse_json(&self) -> ::std::result::Result<HashMap<String, String>, anyhow::Error> {
-        let mut params: HashMap<String, String> = HashMap::new();
-        if let Some(data) = &self.data {
-            params = serde_json::from_str(data)?;
-        }
-
-        Ok(params)
-    }
-    pub fn parse_json_as<T: DeserializeOwned>(&self) -> ::std::result::Result<Option<T>, anyhow::Error> {
+    /// parse json data as a Rust serde struct, may have opion when data is None
+    pub fn parse_json<T: DeserializeOwned>(
+        &self,
+    ) -> ::std::result::Result<Option<T>, anyhow::Error> {
         if let Some(data) = &self.data {
             let parsed: T = serde_json::from_str(data)?;
             Ok(Some(parsed))
@@ -116,14 +110,28 @@ impl EightFishRequest {
             Ok(None)
         }
     }
-    
+
     /// Parse JSON data into any deserializable type (returns error if no data)
-    pub fn parse_json_required<T: DeserializeOwned>(&self) -> ::std::result::Result<T, anyhow::Error> {
+    pub fn parse_json_required<T: DeserializeOwned>(
+        &self,
+    ) -> ::std::result::Result<T, anyhow::Error> {
         if let Some(ref data) = self.data {
             let parsed: T = serde_json::from_str(data)?;
             Ok(parsed)
         } else {
             Err(anyhow::anyhow!("No JSON data available"))
         }
+    }
+
+    /// parse json data as a Rust std HashMap
+    pub fn parse_json_as_hashmap(
+        &self,
+    ) -> ::std::result::Result<HashMap<String, String>, anyhow::Error> {
+        let mut params: HashMap<String, String> = HashMap::new();
+        if let Some(data) = &self.data {
+            params = serde_json::from_str(data)?;
+        }
+
+        Ok(params)
     }
 }
