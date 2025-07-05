@@ -2,8 +2,8 @@ use self::CharacterClass::{Ascii, InvalidChars, ValidChars};
 use std::collections::HashSet;
 use std::u64;
 
-#[cfg(test)]
-use std::collections::BTreeSet;
+// #[cfg(test)]
+// use std::collections::BTreeSet;
 
 #[derive(PartialEq, Eq, Clone)]
 pub struct CharSet {

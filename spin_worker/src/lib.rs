@@ -1,28 +1,33 @@
 use anyhow::{anyhow, Result};
 use bytes::Bytes;
 use eightfish_sdk::{
-    App as EightFishApp, Handler, HandlerCRUD, Method, Request as EightFishRequest,
+    App as EightFishApp, Handler, Method, Request as EightFishRequest,
     Response as EightFishResponse,
 };
+use http::{HeaderMap, StatusCode};
 use serde::Deserialize;
 use serde_json::json;
 use spin_sdk::{
-    pg::{self, Decode},
-    redis, variables,
+    redis::{self, RedisParameter, RedisResult},
+    variables,
 };
 use std::collections::HashMap;
 
-const REDIS_URL_ENV: &str = "REDIS_URL_ENV";
-const DB_URL_ENV: &str = "DB_URL_ENV";
-const TMP_CACHE_RESULTS: &str = "tmp:cache:#";
+const REDIS_URL: &str = "REDIS_URL";
+const DB_URL: &str = "DB_URL";
 const CACHE_STATUS_RESULTS: &str = "cache:status:#";
+const CACHE_HEADERS_RESULTS: &str = "cache:headers:#";
 const CACHE_RESULTS: &str = "cache:#";
+const CACHE_STACKCOUNT: &str = "cache:stackcount:#";
+const CACHE_PAIRLIST: &str = "cache:pairlist:#";
 const CHANNEL_GATE2VIN: &str = "gate2vin";
 const ACTION_NEW_BLOCK_HEIGHT: &str = "block_height";
 const ACTION_UPLOAD_WASM: &str = "upload_wasm";
 const ACTION_UPGRADE_WASM: &str = "upgrade_wasm";
-const ACTION_QUERY: &str = "query";
+const ACTION_GET: &str = "get";
 const ACTION_POST: &str = "post";
+const ACTION_PUT: &str = "put";
+const ACTION_DELETE: &str = "delete";
 const ACTION_UPDATE_INDEX: &str = "update_index";
 const ACTION_CHECK_PAIR_LIST: &str = "check_pair_list";
 
@@ -39,10 +44,19 @@ pub struct InputOutputObject {
 pub struct Payload {
     reqid: String,
     reqdata: Option<String>,
+    reqheaders: HashMap<String, String>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct OnBlockHeightPayload {
+    block_height: u64,
+    block_hash: String,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct ExtPayload {
+    block_height: u64,
+    block_hash: String,
     time: u64,
     nonce: u64,
     randomvec: Vec<u8>,
@@ -50,26 +64,39 @@ pub struct ExtPayload {
 
 pub struct Worker {
     app: EightFishApp,
+    on_block_height: Option<Box<dyn Fn(u64, String) + Send + Sync + 'static>>,
 }
 
 impl Worker {
     pub fn mount(app: EightFishApp) -> Self {
-        Worker { app }
+        Worker {
+            app,
+            on_block_height: None,
+        }
     }
 
-    pub fn work(self, message: Bytes) -> Result<()> {
+    // Method to set the closure
+    pub fn set_on_block_height<F>(&mut self, closure: F)
+    where
+        F: Fn(u64, String) + Send + Sync + 'static,
+    {
+        self.on_block_height = Some(Box::new(closure));
+    }
+
+    pub fn work(&self, message: Bytes) -> Result<()> {
         let msg_obj: InputOutputObject = serde_json::from_slice(&message)?;
         // println!("Worker::work: msg_obj: {:?}", msg_obj);
 
         match &msg_obj.action[..] {
             ACTION_NEW_BLOCK_HEIGHT => {
                 // use msg as a timer, tick on every block height
-                let body: [u8; 8] = msg_obj.data.try_into().unwrap_or([0; 8]);
-                // convert to u64
-                let _block_height = u64::from_be_bytes(body);
+                let payload: OnBlockHeightPayload = serde_json::from_slice(&msg_obj.data)?;
 
-                // do something
-                // println!("Block height: {block_height}");
+                // println!("Block height: {}", payload.block_height);
+                // println!("Block hash: {}", payload.block_hash);
+                if let Some(closure) = &self.on_block_height {
+                    closure(payload.block_height, payload.block_hash);
+                }
             }
             ACTION_UPLOAD_WASM => {
                 // do nothing, wasm_worker itself doesn't care about new wasm file uploaded
@@ -92,189 +119,256 @@ impl Worker {
                 //     }
                 // }
             }
-            ACTION_QUERY => {
-                let redis_addr = std::env::var(REDIS_URL_ENV)?;
+            ACTION_GET => {
+                let redis_addr = std::env::var(REDIS_URL)?;
+                println!("redis_addr: {}", redis_addr);
                 let redis_conn = redis::Connection::open(&redis_addr)
                     .expect("error when open redis connection.");
-
-                let pg_addr = std::env::var(DB_URL_ENV)?;
-                let pg_conn =
-                    pg::Connection::open(&pg_addr).expect("error when open pg connection.");
 
                 let method = Method::Get;
                 let proto_name = msg_obj.proto.to_owned();
                 // path info put in the model field from the http_gate
                 let path = msg_obj.model.to_owned();
+                println!("get path: {}", path);
+
                 let payload: Payload = serde_json::from_slice(&msg_obj.data)?;
                 let reqid = payload.reqid.to_owned();
+                println!("reqid: {}", reqid);
                 let reqdata = payload.reqdata;
+                println!("reqdata: {:?}", reqdata);
+                let headers: HeaderMap = (&payload.reqheaders).try_into()?;
+                println!("reqheaders: {:?}", headers);
 
-                let mut ef_req = EightFishRequest::new(method, path, reqdata);
-                println!("Worker::work: in query branch: ef_req");
+                let mut ef_req = EightFishRequest::new(
+                    method,
+                    path,
+                    reqid.clone(),
+                    headers,
+                    Some(proto_name.clone()),
+                    reqdata,
+                );
+                // println!("Worker::work: in query branch: ef_req");
 
                 let ef_res = self.app.handle(&mut ef_req);
                 match ef_res {
                     Ok(ef_res) => {
-                        println!("Worker::work: in query branch: ef_res: {:?}", ef_res);
-                        // we check the intermediate result  in the framework internal
-                        let pair_list =
-                            inner_stuffs_on_query_result(&redis_conn, &pg_conn, &reqid, &ef_res)
-                                .unwrap();
-                        println!("Worker::work: in query branch: pair_list: {:?}", pair_list);
+                        match ef_res.status_code() {
+                            StatusCode::OK => {
+                                // process successful status case
+                                store_result_to_cache(&redis_conn, &reqid, &ef_res);
 
-                        if pair_list.is_some() {
-                            let model_name = ef_res.info().model_name.to_owned();
-                            // we can retrieve the model name from the path
-                            // but that will force the developer use a strict unified url shcema in his product
-                            // the names in query and post must MATCH
-                            tail_query_process(
-                                &redis_conn,
-                                &reqid,
-                                &proto_name,
-                                &model_name,
-                                &pair_list.unwrap(),
-                            );
+                                if let &Some(ref avec) = ef_res.pair_list() {
+                                    if !avec.is_empty() {
+                                        // if to-be-validated data is a non-empty vector
+                                        let model_name = ef_res.model_name().as_ref().unwrap();
+                                        check_pair_list_from_vintage(
+                                            &redis_conn,
+                                            &reqid,
+                                            &proto_name,
+                                            model_name,
+                                            avec,
+                                        );
+                                    }
+                                }
+                            }
+                            _ => {
+                                let headers = ef_res.headers().clone();
+                                // process failed status case
+                                let data_to_cache =
+                                    ef_res.custom_result().to_owned().unwrap_or_default();
+                                set_cache_result(&redis_conn, &reqid, headers, &data_to_cache);
+                                let status_code: u16 = ef_res.status_code().into();
+                                set_cache_status_code(
+                                    &redis_conn,
+                                    &reqid,
+                                    &status_code.to_string(),
+                                );
+                            }
                         }
                     }
                     Err(err) => {
-                        err_process(err, &redis_conn, &reqid);
-                        return Err(anyhow!("query error"));
+                        return err_process(err, &redis_conn, &reqid);
                     }
                 }
             }
-            ACTION_POST => {
-                let redis_addr = std::env::var(REDIS_URL_ENV)?;
+            ACTION_POST | ACTION_PUT | ACTION_DELETE => {
+                let redis_addr = std::env::var(REDIS_URL)?;
                 println!("redis_addr: {}", redis_addr);
                 let redis_conn = redis::Connection::open(&redis_addr)
                     .expect("error when open redis connection.");
 
-                let pg_addr = std::env::var(DB_URL_ENV)?;
+                let pg_addr = std::env::var(DB_URL)?;
                 println!("pg_addr: {}", pg_addr);
-                let pg_conn =
-                    pg::Connection::open(&pg_addr).expect("error when open pg connection.");
+                // let pg_conn =
+                //     pg::Connection::open(&pg_addr).expect("error when open pg connection.");
 
-                let method = Method::Post;
+                let method = match &msg_obj.action[..] {
+                    "post" => Method::Post,
+                    "put" => Method::Put,
+                    "delete" => Method::Delete,
+                    _ => return Err(anyhow::anyhow!("wrong http method.")),
+                };
+                println!("in action write: method: {:?}", method);
                 let proto_name = msg_obj.proto.to_owned();
+                println!("in action write: proto: {:?}", proto_name);
                 let path = msg_obj.model.to_owned();
+                println!("in action write: path: {:?}", path);
                 let payload: Payload = serde_json::from_slice(&msg_obj.data)?;
                 let reqid = payload.reqid.to_owned();
+                println!("in action write: reqid: {:?}", reqid);
                 let reqdata = payload.reqdata;
+                println!("in action write: reqdata: {:?}", reqdata);
+                let headers: HeaderMap = (&payload.reqheaders).try_into()?;
+                println!("reqheaders: {:?}", headers);
+
                 let ext: ExtPayload = serde_json::from_slice(&msg_obj.ext)?;
 
-                let mut ef_req = EightFishRequest::new(method, path, reqdata);
-                println!("Worker::work: in post branch: ef_req");
+                let mut ef_req = EightFishRequest::new(
+                    method,
+                    path,
+                    reqid.clone(),
+                    headers,
+                    Some(proto_name.clone()),
+                    reqdata,
+                );
 
-                // add time to req.ext
+                // insert block_height, block_hash, time, nonce and random_str to req.ext
                 ef_req
                     .ext_mut()
-                    .insert("time".to_string(), ext.time.to_string());
-                // add nonce to req.ext
+                    .insert("block_height".to_string(), ext.block_height.to_string());
+                // encode the hex digitals as base58 string
+                // let block_hash_str = bs58::encode(&ext.block_hash).into_string();
+                ef_req
+                    .ext_mut()
+                    .insert("block_hash".to_string(), ext.block_hash);
+                ef_req
+                    .ext_mut()
+                    .insert("timestamp".to_string(), ext.time.to_string());
                 ef_req
                     .ext_mut()
                     .insert("nonce".to_string(), ext.nonce.to_string());
-                // encode the vec<u8> as base58 string, and add random_str to req.ext
+                // encode the vec<u8> as base58 string
                 let random_string = bs58::encode(&ext.randomvec).into_string();
                 ef_req
                     .ext_mut()
                     .insert("random_str".to_string(), random_string);
+                println!("in action write: req.ext: {:?}", ef_req.ext());
 
                 let ef_res = self.app.handle(&mut ef_req);
                 match ef_res {
                     Ok(ef_res) => {
-                        println!("Worker::work: in post branch: ef_res: {:?}", ef_res);
-                        let pair_list =
-                            inner_stuffs_on_post_result(&redis_conn, &pg_conn, &reqid, &ef_res)
-                                .unwrap();
-                        println!("Worker::work: in post branch: pair_list: {:?}", pair_list);
+                        match ef_res.status_code() {
+                            StatusCode::OK => {
+                                // process successful status case
+                                // store intermedia data to cache
+                                store_result_to_cache(&redis_conn, &reqid, &ef_res);
 
-                        if !pair_list.is_empty() {
-                            let model_name = ef_res.info().model_name.to_owned();
-                            tail_post_process(
-                                &redis_conn,
-                                &reqid,
-                                &proto_name,
-                                &model_name,
-                                &pair_list,
-                            );
+                                if let &Some(ref avec) = ef_res.pair_list() {
+                                    if !avec.is_empty() {
+                                        // set pair_list to a cache
+                                        let key = CACHE_PAIRLIST.replace('#', &reqid);
+                                        let val = if msg_obj.action == ACTION_DELETE {
+                                            let avec: Vec<(String, String)> = avec
+                                                .iter()
+                                                .map(|(id, _hash)| (id.to_owned(), "".to_string()))
+                                                .collect();
+                                            serde_json::to_vec(&avec)?
+                                        } else {
+                                            serde_json::to_vec(avec)?
+                                        };
+                                        _ = redis_conn.set(&key, &val);
+                                    }
+                                }
+                            }
+                            _ => {
+                                let headers = ef_res.headers().clone();
+                                // process failed status case
+                                let data_to_cache =
+                                    ef_res.custom_result().to_owned().unwrap_or_default();
+                                set_cache_result(&redis_conn, &reqid, headers, &data_to_cache);
+                                let status_code: u16 = ef_res.status_code().into();
+                                set_cache_status_code(
+                                    &redis_conn,
+                                    &reqid,
+                                    &status_code.to_string(),
+                                );
+                            }
                         }
                     }
                     Err(err) => {
-                        err_process(err, &redis_conn, &reqid);
-                        return Err(anyhow!("post error"));
+                        return err_process(err, &redis_conn, &reqid);
                     }
                 }
             }
-
             ACTION_UPDATE_INDEX => {
                 // Callback: handle the result of the update_index call event
-                // the format of the msg_obj.data is: reqid:id:hash
-                // and msg.model is model, msg.action is action
-                //let v: Vec<&str> = std::str::from_utf8(&msg_obj.data).unwrap().split(':').collect();
-                //println!("index_update callback: v: {:?}", v);
-                //let reqid = &v[0];
-                //let id = &v[1];
-                //let hash = &v[2];
+                // println!("callback: update_index: start. {:?}", msg_obj);
                 let payload: Payload = serde_json::from_slice(&msg_obj.data)?;
                 println!("callback: update_index: payload: {:?}", payload);
-                let reqid = payload.reqid.to_owned();
-                // let id = payload.reqdata.unwrap();
 
-                // let result = json!({
-                //     "result": "Ok",
-                //     "id": id,
-                // });
+                let reqid = payload.reqid;
 
-                // while getting the index updated callback, we put result http_gate wants into redis
-                // cache
-                let redis_addr = std::env::var(REDIS_URL_ENV)?;
+                let redis_addr = std::env::var(REDIS_URL)?;
                 let redis_conn = redis::Connection::open(&redis_addr)
                     .expect("error when open redis connection.");
 
-                // in previous post process, we have set the TMP_CACHE_RESULTS
-                let tmpdata = redis_conn.get(&TMP_CACHE_RESULTS.replace('#', &reqid));
-                println!("callback: update_index: tmpdata: {:?}", tmpdata);
-                if let Ok(Some(tmpdata)) = tmpdata {
-                    // set to CACHE_RESULTS
-                    let _ = redis_conn.set(&CACHE_RESULTS.replace('#', &reqid), &tmpdata);
-                    // put status results behind to avoid the atomic result retrieving problem
-                    let cache_key = CACHE_STATUS_RESULTS.replace('#', &reqid);
-                    _ = redis_conn.set(&cache_key, &b"200".to_vec());
+                if let Ok(n) = decr_stackcount(&redis_conn, &reqid) {
+                    if n == 0 {
+                        // for new_check
+                        // for write case, we also need to check pair list for result
+                        let key0 = CACHE_STACKCOUNT.replace("#", &reqid);
+                        let key1 = CACHE_PAIRLIST.replace('#', &reqid);
+                        if let Some(avec) = redis_conn.get(&key1)? {
+                            let pair_list: Vec<(String, String)> = serde_json::from_slice(&avec)?;
+                            if !pair_list.is_empty() {
+                                check_pair_list_from_vintage(
+                                    &redis_conn,
+                                    &reqid,
+                                    &msg_obj.proto,
+                                    &msg_obj.model,
+                                    &pair_list,
+                                );
+                            }
+                        } else {
+                            // for new_uncheck, let it go at here
+                            let status_code = StatusCode::OK.as_u16().to_string();
+                            set_cache_status_code(&redis_conn, &reqid, &status_code);
+                        }
+
+                        // clear the stack count key
+                        _ = redis_conn.del(&[key0, key1]);
+                    }
+                } else {
+                    // nothing
                 }
-                // delete the tmp cache
-                _ = redis_conn.del(&[TMP_CACHE_RESULTS.replace('#', &reqid)]);
+
+                // TODO: we need handle the error case when vintage throws erros
+                // put it in the future version
             }
             ACTION_CHECK_PAIR_LIST => {
-                let redis_addr = std::env::var(REDIS_URL_ENV)?;
+                let redis_addr = std::env::var(REDIS_URL)?;
                 let redis_conn = redis::Connection::open(&redis_addr)
                     .expect("error when open redis connection.");
 
                 // handle the result of the check_pair_list
                 let payload: Payload = serde_json::from_slice(&msg_obj.data)?;
-                let reqid = payload.reqid.clone();
-                let reqdata = payload.reqdata.unwrap();
+                let reqid = payload.reqid;
+                let reqdata = payload.reqdata.unwrap_or_default();
+                println!(
+                    "on action check pair list: reqid reqdata: {:?} {:?}",
+                    reqid, reqdata
+                );
 
                 if &reqdata == "true" {
-                    // check pass, get content from the tmp cache and write this content to a cache
-                    let tmpdata = redis_conn.get(&TMP_CACHE_RESULTS.replace('#', &reqid));
-                    if let Ok(Some(tmpdata)) = tmpdata {
-                        let _ = redis_conn.set(&CACHE_RESULTS.replace('#', &reqid), &tmpdata);
-                        // put status results behind to avoid the atomic result retrieving problem
-                        _ = redis_conn
-                            .set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"200".to_vec());
-                    }
-                    // delete the tmp cache
-                    _ = redis_conn.del(&[TMP_CACHE_RESULTS.replace('#', &reqid)]);
+                    let status_code = StatusCode::OK.as_u16();
+
+                    // set cache status to make response data ready
+                    set_cache_status_code(&redis_conn, &reqid, &status_code.to_string());
                 } else {
-                    let data = "check of pair list wrong!";
-                    _ = redis_conn.set(
-                        &CACHE_RESULTS.replace('#', &reqid),
-                        &data.as_bytes().to_vec(),
-                    );
-                    // put status results behind to avoid the atomic result retrieving problem
-                    _ = redis_conn
-                        .set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"400".to_vec());
-                    // clear left tmp cache key
-                    _ = redis_conn.del(&[TMP_CACHE_RESULTS.replace('#', &reqid)]);
+                    let data = "Checking pair list failed, abort the response!";
+                    set_cache_result(&redis_conn, &reqid, None, data);
+                    let status_code = StatusCode::UNPROCESSABLE_ENTITY.as_u16();
+                    set_cache_status_code(&redis_conn, &reqid, &status_code.to_string());
                 }
             }
             &_ => {
@@ -286,7 +380,121 @@ impl Worker {
     }
 }
 
-fn tail_query_process(
+fn check_stackcount(redis_conn: &redis::Connection, reqid: &str) -> Result<i64> {
+    let key0 = CACHE_STACKCOUNT.replace("#", &reqid);
+    if let Some(payload) = redis_conn.get(&key0)? {
+        let value = i64::from_le_bytes(
+            payload
+                .try_into()
+                .map_err(|_| anyhow::anyhow!("Invalid payload"))?,
+        );
+
+        Ok(value)
+    } else {
+        Ok(0)
+    }
+}
+
+fn decr_stackcount(redis_conn: &redis::Connection, reqid: &str) -> Result<i64> {
+    // for any write action, we seem them the same, and
+    // decrease the stack count on each event of them arrives
+    let key0 = CACHE_STACKCOUNT.replace("#", &reqid);
+    let param1 = RedisParameter::Binary(key0.as_bytes().to_vec());
+    let avec: Vec<i64> = redis_conn
+        .execute("decr", &[param1])?
+        .into_iter()
+        .map(|res| match res {
+            RedisResult::Int64(result) => result,
+            _ => -1,
+        })
+        .collect();
+
+    println!("decr stackcount: {:?}", avec);
+    if !avec.is_empty() {
+        Ok(avec[0])
+    } else {
+        Ok(-1)
+    }
+}
+
+fn store_result_to_cache(redis_conn: &redis::Connection, reqid: &str, res: &EightFishResponse) {
+    let headers = res.headers().clone();
+    if let &Some(ref avec) = res.pair_list() {
+        if !avec.is_empty() {
+            let data_to_cache = res.result().as_ref().unwrap();
+
+            // here we do not set the status code, when check_pair_list returns, get it
+            set_cache_result(redis_conn, reqid, headers, data_to_cache);
+        } else {
+            // if data array to return is an empty vector, return it immediately
+            // [] is a valid json empty array.
+            let data_to_cache = "[]";
+            set_cache_result(redis_conn, reqid, headers, data_to_cache);
+            let status_code = StatusCode::OK.as_u16().to_string();
+            set_cache_status_code(&redis_conn, &reqid, &status_code);
+        }
+    } else {
+        if let &Some(ref astr) = res.custom_result() {
+            // return customized string body
+            // for this case, we need yet to wait the STACKCOUNTER decreased to 0
+            let data_to_cache = astr;
+            set_cache_result(redis_conn, reqid, headers, data_to_cache);
+            if let Ok(0) = check_stackcount(redis_conn, reqid) {
+                let status_code = StatusCode::OK.as_u16().to_string();
+                set_cache_status_code(&redis_conn, &reqid, &status_code);
+                // clear the stackcount key
+                // let key0 = CACHE_STACKCOUNT.replace("#", &reqid);
+                // _ = redis_conn.del(&[key0]);
+            }
+        } else {
+            // for the no content result, return it immediately
+            let data_to_cache = "<no content>";
+            set_cache_result(redis_conn, reqid, headers, data_to_cache);
+            let status_code = StatusCode::OK.as_u16().to_string();
+            set_cache_status_code(&redis_conn, &reqid, &status_code);
+        }
+    }
+}
+
+fn set_cache_result(
+    redis_conn: &redis::Connection,
+    reqid: &str,
+    headers: Option<HeaderMap>,
+    data_to_cache: &str,
+) {
+    if headers.is_none() {
+        _ = redis_conn.set(&CACHE_HEADERS_RESULTS.replace('#', &reqid), &b"{}".to_vec());
+    } else {
+        let headers_map: HashMap<String, String> = headers
+            .unwrap()
+            .into_iter()
+            .filter_map(|(name, value)| {
+                name.map(|n| {
+                    (
+                        n.as_str().to_string(),
+                        value.to_str().unwrap_or_default().to_string(),
+                    )
+                })
+            })
+            .collect();
+        let headers_vec = serde_json::to_vec(&headers_map).unwrap_or_else(|_| Vec::new());
+
+        _ = redis_conn.set(&CACHE_HEADERS_RESULTS.replace('#', &reqid), &headers_vec);
+    }
+    _ = redis_conn.set(
+        &CACHE_RESULTS.replace('#', &reqid),
+        &data_to_cache.as_bytes().to_vec(),
+    );
+}
+
+fn set_cache_status_code(redis_conn: &redis::Connection, reqid: &str, status_code: &str) {
+    _ = redis_conn.set(
+        &CACHE_STATUS_RESULTS.replace('#', &reqid),
+        &status_code.as_bytes().to_vec(),
+    );
+}
+
+fn check_pair_list_from_vintage(
     redis_conn: &redis::Connection,
     reqid: &str,
     proto_name: &str,
@@ -297,8 +505,8 @@ fn tail_query_process(
         "reqid": reqid,
         "reqdata": Some(pair_list),
     });
+    println!("check_pair_list_from_vintage: payload: {:?}", payload);
 
-    println!("tail_query_process: payload: {:?}", payload);
     let json_to_send = json!({
         "proto": proto_name,
         "model": model_name,
@@ -314,7 +522,37 @@ fn tail_query_process(
     );
 }
 
-fn tail_post_process(
+fn err_process(err: anyhow::Error, redis_conn: &redis::Connection, reqid: &str) -> Result<()> {
+    println!("handler error: {:?}", err);
+    match err.downcast_ref::<&str>() {
+        Some(&"404") => {
+            // write not found msg to cache
+            _ = redis_conn.set(&CACHE_RESULTS.replace('#', &reqid), &b"Not Found".to_vec());
+            _ = redis_conn.set(&CACHE_HEADERS_RESULTS.replace('#', &reqid), &b"{}".to_vec());
+            _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"404".to_vec());
+        }
+        Some(s) => {
+            // FIXME: logical error? we must choose a better status code scheme
+            _ = redis_conn.set(&CACHE_RESULTS.replace('#', &reqid), &s.as_bytes().to_vec());
+            _ = redis_conn.set(&CACHE_HEADERS_RESULTS.replace('#', &reqid), &b"{}".to_vec());
+            _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"400".to_vec());
+        }
+        None => {
+            // other errors
+            _ = redis_conn.set(
+                &CACHE_RESULTS.replace('#', &reqid),
+                &format!("{}", err).as_bytes().to_vec(),
+            );
+            _ = redis_conn.set(&CACHE_HEADERS_RESULTS.replace('#', &reqid), &b"{}".to_vec());
+            _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"500".to_vec());
+        }
+    }
+
+    Err(anyhow!("handler error"))
+}
+
+#[allow(dead_code)]
+pub fn update_index_on_write(
     redis_conn: &redis::Connection,
     reqid: &str,
     proto_name: &str,
@@ -325,7 +563,7 @@ fn tail_post_process(
         "reqid": reqid,
         "reqdata": Some(pair_list),
     });
-    println!("tail_post_process: payload: {:?}", payload);
+    println!("update_index_on_write: payload: {:?}", payload);
 
     let json_to_send = json!({
         "proto": proto_name,
@@ -339,167 +577,308 @@ fn tail_post_process(
         CHANNEL_GATE2VIN,
         &json_to_send.to_string().as_bytes().to_vec(),
     );
+
+    // increase write stack count
+    _ = redis_conn.incr(&CACHE_STACKCOUNT.replace('#', reqid));
 }
 
-fn inner_stuffs_on_query_result(
-    redis_conn: &redis::Connection,
-    pg_conn: &pg::Connection,
-    reqid: &str,
-    res: &EightFishResponse,
-) -> Result<Option<Vec<(String, String)>>> {
-    if res.pair_list().is_some() {
-        let table_name = &res.info().model_name;
-        let pair_list = res.pair_list().clone().unwrap();
-        // get the id list from obj list
-        let ids: Vec<String> = pair_list
-            .iter()
-            .map(|(id, _)| String::new() + "'" + &id[..] + "'")
-            .collect();
-        let ids_string = ids.join(",");
+#[allow(dead_code)]
+pub fn append_returning_star(sql: &str) -> String {
+    let trimmed = sql.trim().trim_end_matches(";");
+    if trimmed.to_uppercase().ends_with("RETURNING *") {
+        format!("{};", trimmed)
+    } else {
+        format!("{} RETURNING *;", trimmed)
+    }
+}
 
-        let query_string =
-            format!("select id, hash from {table_name}_idhash where id in ({ids_string})");
-        println!("query_string: {:?}", query_string);
-        let rowset = pg_conn.query(&query_string, &[]).unwrap();
+#[macro_export]
+macro_rules! sql_create_one {
+    ($req:expr, $instance:expr) => {{
+        use spin_sdk::{pg, redis};
 
-        let mut idhash_map: HashMap<String, String> = HashMap::new();
-        for row in rowset.rows {
-            let id = String::decode(&row[0])?;
-            let hash = String::decode(&row[1])?;
+        let pg_addr = std::env::var(DB_URL).expect("ENV DB_URL not set.");
+        let pg_conn = pg::Connection::open(&pg_addr).expect("error when open pg connection.");
 
-            idhash_map.insert(id, hash);
-        }
+        let (sql_statement, sql_params) = $instance.build_insert();
+        println!("sql str: {}", sql_statement);
+        println!("sql params: {:?}", sql_params);
 
-        // iterate on the input results to check
-        for (id, chash) in pair_list.iter() {
-            let hash_from_map = idhash_map.get(&id[..]).expect("");
-            println!("chash, hash_from_map: {:?}, {:?}", chash, hash_from_map);
-            if chash != hash_from_map {
-                return Err(anyhow!("Hash mismatching.".to_string()));
+        let res = pg_conn.query(&sql_statement, &sql_params);
+        match res {
+            Ok(_) => {
+                let instance_id = $instance.id();
+                let instance_hash = $instance.calc_hash();
+                let pair_list = vec![(instance_id, instance_hash)];
+
+                let table_name = $instance.model_name();
+                let reqid = $req.id();
+                let proto_name = $req.proto().to_owned().unwrap_or_default();
+                let redis_addr = std::env::var(REDIS_URL).expect("ENV REDIS_URLnot set.");
+                let redis_conn = redis::Connection::open(&redis_addr)
+                    .expect("error when open redis connection.");
+
+                // update index to vintage
+                spin_worker::update_index_on_write(
+                    &redis_conn,
+                    &reqid,
+                    &proto_name,
+                    &table_name,
+                    &pair_list,
+                );
+
+                Ok($instance)
             }
+            Err(e) => Err(e),
         }
-
-        println!("res.results: {:?}", res.results());
-        // store to cache for http gate to retrieve
-        let data_to_cache = res.results().clone().unwrap_or("".to_string());
-        _ = redis_conn.set(
-            &TMP_CACHE_RESULTS.replace('#', reqid),
-            &data_to_cache.as_bytes().to_vec(),
-        );
-
-        Ok(Some(pair_list.to_vec()))
-    } else {
-        let data_to_cache = res.results().clone().unwrap_or("[]".to_string());
-        _ = redis_conn.set(
-            &CACHE_RESULTS.replace('#', &reqid),
-            &data_to_cache.as_bytes().to_vec(),
-        );
-        _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"200".to_vec());
-
-        Ok(None)
-    }
+    }};
 }
 
-fn inner_stuffs_on_post_result(
-    redis_conn: &redis::Connection,
-    pg_conn: &pg::Connection,
-    reqid: &str,
-    res: &EightFishResponse,
-) -> Result<Vec<(String, String)>> {
-    let table_name = &res.info().model_name;
-    let action = &res.info().action;
-    let id;
-    let ins_hash;
+#[macro_export]
+macro_rules! sql_update_one {
+    ($req:expr, $instance:expr) => {{
+        use spin_sdk::{pg, redis};
 
-    if res.pair_list().is_some() {
-        // here, we just process single updated item returning
-        let pair = &res.pair_list().clone().unwrap()[0];
-        id = pair.0.clone();
-        ins_hash = pair.1.clone();
-    } else {
-        let data_to_cache = "[]".to_string();
-        _ = redis_conn.set(
-            &CACHE_RESULTS.replace('#', &reqid),
-            &data_to_cache.as_bytes().to_vec(),
+        let pg_addr = std::env::var(DB_URL).expect("ENV DB_URL not set.");
+        let pg_conn = pg::Connection::open(&pg_addr).expect("error when open pg connection.");
+
+        let (sql_statement, sql_params) = $instance.build_update();
+        println!(
+            "in sql_update_one!. sql_statement, sql_params: {:?} {:?}",
+            sql_statement, sql_params
         );
-        _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"200".to_vec());
+        let res = pg_conn.query(&sql_statement, &sql_params);
+        match res {
+            Ok(_) => {
+                let instance_id = $instance.id();
+                let instance_hash = $instance.calc_hash();
+                // recalculate the new instance's id hash pair
+                let pair_list = vec![(instance_id, instance_hash)];
 
-        return Ok(vec![]);
-    }
+                let table_name = $instance.model_name();
+                let reqid = $req.id();
+                let proto_name = $req.proto().to_owned().unwrap();
+                let redis_addr = std::env::var(REDIS_URL).expect("ENV REDIS_URL not set.");
+                let redis_conn = redis::Connection::open(&redis_addr)
+                    .expect("error when open redis connection.");
 
-    match action {
-        HandlerCRUD::Create => {
-            let sql_string = format!(
-                "insert into {table_name}_idhash values ('{}', '{}')",
-                id, ins_hash
-            );
-            let _execute_results = pg_conn.execute(&sql_string, &[]);
-            // TODO: check the pg result
-            println!(
-                "in post stuff: new: _execute_results: {:?}",
-                _execute_results
-            );
+                // update index to vintage
+                spin_worker::update_index_on_write(
+                    &redis_conn,
+                    &reqid,
+                    &proto_name,
+                    &table_name,
+                    &pair_list,
+                );
+
+                Ok($instance)
+            }
+            Err(e) => Err(e),
         }
-        HandlerCRUD::Update => {
-            let sql_string =
-                format!("update {table_name}_idhash set hash='{ins_hash}' where id='{id}'");
-            let _execute_results = pg_conn.execute(&sql_string, &[]);
-            println!(
-                "in post stuff: update: _execute_results: {:?}",
-                _execute_results
-            );
-        }
-        HandlerCRUD::Delete => {
-            let sql_string = format!("delete {table_name}_idhash where id='{id}'");
-            let _execute_results = pg_conn.execute(&sql_string, &[]);
-            // TODO: check the pg result
-            println!(
-                "in post stuff: delete: _execute_results: {:?}",
-                _execute_results
-            );
-        }
-        _ => unreachable!(),
-    }
-
-    // write response to tmp cache
-    let data_to_cache = res.results().to_owned().unwrap_or("".to_string());
-    println!(
-        "in inner_stuffs_on_post_result, res.results(): {:?}",
-        res.results()
-    );
-    println!(
-        "in inner_stuffs_on_post_result, to tmp cache: {}",
-        data_to_cache
-    );
-    _ = redis_conn.set(
-        &TMP_CACHE_RESULTS.replace('#', reqid),
-        &data_to_cache.as_bytes().to_vec(),
-    );
-
-    let pair_list: Vec<(String, String)> = vec![(id, ins_hash)];
-
-    Ok(pair_list)
+    }};
 }
 
-fn err_process(err: anyhow::Error, redis_conn: &redis::Connection, reqid: &str) {
-    match err.downcast_ref::<&str>() {
-        Some(&"404") => {
-            // write not found msg to cache
-            _ = redis_conn.set(&CACHE_RESULTS.replace('#', &reqid), &b"Not Found".to_vec());
-            _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"404".to_vec());
+#[macro_export]
+macro_rules! sql_update {
+    ($req:expr, $model:ty, $sql_statement:expr, $sql_params:expr) => {{
+        use spin_sdk::{pg, redis};
+
+        let pg_addr = std::env::var(DB_URL).expect("ENV DB_URL not set.");
+        let pg_conn = pg::Connection::open(&pg_addr).expect("error when open pg connection.");
+
+        let sql_str = spin_worker::append_returning_star($sql_statement);
+        println!("in sql_update, sql str: {}", sql_str);
+        println!("in sql_update, sql params: {:?}", $sql_params);
+
+        let res = pg_conn.query(&sql_str, $sql_params);
+        match res {
+            Ok(rowset) => {
+                let mut instances = vec![];
+                for row in rowset.rows {
+                    let instance = <$model>::from_row(row);
+                    instances.push(instance);
+                }
+
+                if !instances.is_empty() {
+                    let mut pair_list = vec![];
+
+                    // collect affected rows' id and hash
+                    for instance in &instances {
+                        let instance_id = instance.id();
+                        let instance_hash = instance.calc_hash();
+                        pair_list.push((instance_id, instance_hash));
+                    }
+
+                    let table_name = <$model>::model_name();
+                    let reqid = $req.id();
+                    let proto_name = $req.proto().to_owned().unwrap();
+                    let redis_addr = std::env::var(REDIS_URL).expect("ENV REDIS_URL not set.");
+                    let redis_conn = redis::Connection::open(&redis_addr)
+                        .expect("error when open redis connection.");
+
+                    // update index to vintage
+                    spin_worker::update_index_on_write(
+                        &redis_conn,
+                        &reqid,
+                        &proto_name,
+                        &table_name,
+                        &pair_list,
+                    );
+
+                    Ok(instances)
+                } else {
+                    Ok(vec![])
+                }
+            }
+            Err(e) => Err(e),
         }
-        Some(s) => {
-            // write not found msg to cache
-            _ = redis_conn.set(&CACHE_RESULTS.replace('#', &reqid), &s.as_bytes().to_vec());
-            _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"500".to_vec());
+    }};
+}
+
+#[macro_export]
+macro_rules! sql_delete_one {
+    ($req:expr, $instance:expr) => {{
+        use spin_sdk::{pg, redis};
+
+        let pg_addr = std::env::var(DB_URL).expect("ENV DB_URL not set.");
+        let pg_conn = pg::Connection::open(&pg_addr).expect("error when open pg connection.");
+
+        let (sql_statement, sql_params) = $instance.build_delete();
+        println!("sql str: {}", sql_statement);
+        println!("sql params: {:?}", sql_params);
+
+        let res = pg_conn.query(&sql_statement, &sql_params);
+        match res {
+            Ok(_) => {
+                // recalculate the new instance's id hash pair
+                let pair_list = vec![($instance.id(), "".to_string())];
+
+                let table_name = $instance.model_name();
+                let reqid = $req.id();
+                let proto_name = $req.proto().to_owned().unwrap();
+
+                let redis_addr = std::env::var(REDIS_URL).expect("ENV REDIS_URL not set.");
+                let redis_conn = redis::Connection::open(&redis_addr)
+                    .expect("error when open redis connection.");
+
+                // update index to vintage
+                spin_worker::update_index_on_write(
+                    &redis_conn,
+                    &reqid,
+                    &proto_name,
+                    &table_name,
+                    &pair_list,
+                );
+
+                Ok($instance)
+            }
+            Err(e) => Err(e),
         }
-        None => {
-            // write not found msg to cache
-            _ = redis_conn.set(
-                &CACHE_RESULTS.replace('#', &reqid),
-                &format!("{}", err).as_bytes().to_vec(),
-            );
-            _ = redis_conn.set(&CACHE_STATUS_RESULTS.replace('#', &reqid), &b"500".to_vec());
+    }};
+}
+
+#[macro_export]
+macro_rules! sql_delete {
+    ($req:expr, $model:ty, $sql_statement:expr, $sql_params:expr) => {{
+        use spin_sdk::{pg, redis};
+
+        let pg_addr = std::env::var(DB_URL).expect("ENV DB_URL not set.");
+        let pg_conn = pg::Connection::open(&pg_addr).expect("error when open pg connection.");
+
+        let sql_str = spin_worker::append_returning_star($sql_statement);
+        println!("in sql_delete, sql str: {}", sql_str);
+        println!("in sql_delete, sql str: {:?}", $sql_params);
+
+        let res = pg_conn.query(&sql_str, $sql_params);
+        match res {
+            Ok(rowset) => {
+                let mut instances = vec![];
+                for row in rowset.rows {
+                    let instance = <$model>::from_row(row);
+                    instances.push(instance);
+                }
+
+                if !instances.is_empty() {
+                    let table_name = <$model>::model_name();
+
+                    let mut ids = vec![];
+                    for instance in &instances {
+                        let instance_id = instance.id();
+                        ids.push(instance_id);
+                    }
+                    let pair_list = ids.into_iter().map(|id| (id, "".to_string())).collect();
+
+                    let reqid = $req.id();
+                    let proto_name = $req.proto().to_owned().unwrap();
+
+                    let redis_addr = std::env::var(REDIS_URL).expect("ENV REDIS_URL not set.");
+                    // println!("redis_addr: {}", redis_addr);
+                    let redis_conn = redis::Connection::open(&redis_addr)
+                        .expect("error when open redis connection.");
+
+                    // update index to vintage
+                    spin_worker::update_index_on_write(
+                        &redis_conn,
+                        &reqid,
+                        &proto_name,
+                        &table_name,
+                        &pair_list,
+                    );
+
+                    Ok(instances)
+                } else {
+                    Ok(vec![])
+                }
+            }
+            Err(e) => Err(e),
         }
-    }
+    }};
+}
+
+#[macro_export]
+macro_rules! sql_query_one {
+    ($model: ty, $id: expr) => {{
+        use spin_sdk::pg;
+        use std::collections::HashMap;
+
+        let pg_addr = std::env::var(DB_URL).expect("ENV DB_URL not set.");
+        let pg_conn = pg::Connection::open(&pg_addr).expect("error when open pg connection.");
+
+        let (sql, sql_params) = <$model>::build_get_by_id($id);
+        println!("sql str: {}", sql);
+        println!("sql params: {:?}", sql_params);
+
+        let rowset = pg_conn.query(&sql, &sql_params)?;
+
+        if let Some(row) = rowset.rows.into_iter().next() {
+            let instance = <$model>::from_row(row);
+
+            Some(instance)
+        } else {
+            None
+        }
+    }};
+}
+
+#[macro_export]
+macro_rules! sql_query {
+    ($model:ty, $sql_statement:expr, $sql_params:expr) => {{
+        use spin_sdk::pg;
+        use std::collections::HashMap;
+
+        let pg_addr = std::env::var(DB_URL).expect("ENV DB_URL not set.");
+        let pg_conn = pg::Connection::open(&pg_addr).expect("error when open pg connection.");
+
+        println!("{:?}", $sql_statement);
+        println!("{:?}", $sql_params);
+        let rowset = pg_conn.query($sql_statement, $sql_params)?;
+
+        let mut instances = vec![];
+        for row in rowset.rows.into_iter() {
+            let instance = <$model>::from_row(row);
+            instances.push(instance);
+        }
+
+        instances
+    }};
 }

@@ -1,7 +1,17 @@
+#![allow(unused_imports)]
+
+mod dto_core;
 mod eight_fish_model;
+
+use dto_core::extract_fields_from_type;
 use eight_fish_model::expand_eight_fish_model;
 use proc_macro::TokenStream;
-use syn::{parse_macro_input, DeriveInput};
+use quote::{format_ident, quote};
+use syn::{
+    parse_macro_input,
+    visit::{self, Visit},
+    Data, DeriveInput, Field, Fields, File, Type,
+};
 
 /// Provide method to build simple sql, also used to generate blockchain related data for a EF application entity.
 ///
@@ -87,4 +97,150 @@ use syn::{parse_macro_input, DeriveInput};
 pub fn eight_fish_model(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     expand_eight_fish_model(input).into()
+}
+
+#[proc_macro_attribute]
+pub fn dtocore(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[proc_macro_derive(EightFishDTO, attributes(dtocore))]
+pub fn eight_fish_dto_derive(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = &input.ident;
+
+    let expanded = match &input.data {
+        Data::Struct(data) => {
+            let fields = match &data.fields {
+                Fields::Named(fields) => &fields.named,
+                _ => panic!("Only named fields are supported for EightFishDTO"),
+            };
+
+            // Find the core field
+            let core_field = fields
+                .iter()
+                .find(|field| {
+                    field
+                        .attrs
+                        .iter()
+                        .any(|attr| attr.path().is_ident("dtocore"))
+                })
+                .expect("EightFishDTO requires exactly one field marked with #[dtocore]");
+
+            // Get core field type and name
+            let core_field_type = &core_field.ty;
+            let core_field_name = &core_field.ident;
+
+            // Get core type's fields
+            let core_type_fields = extract_fields_from_type(core_field_type);
+
+            // Collect non-core fields
+            let other_fields: Vec<_> = fields
+                .iter()
+                .filter(|field| {
+                    !field
+                        .attrs
+                        .iter()
+                        .any(|attr| attr.path().is_ident("dtocore"))
+                })
+                .collect();
+
+            // Generate new struct name
+            let flattened_name = format_ident!("{}Flattened", name);
+
+            // Generate fields for the flattened struct
+            let core_field_idents: Vec<_> = core_type_fields.iter().map(|f| &f.ident).collect();
+            let core_field_types: Vec<_> = core_type_fields.iter().map(|f| &f.ty).collect();
+
+            let other_field_idents: Vec<_> = other_fields.iter().map(|f| &f.ident).collect();
+            let other_field_types: Vec<_> = other_fields.iter().map(|f| &f.ty).collect();
+
+            let all_field_idents =
+                vec![core_field_idents.clone(), other_field_idents.clone()].concat();
+            let all_field_types =
+                vec![core_field_types.clone(), other_field_types.clone()].concat();
+            let orders = all_field_idents
+                .iter()
+                .enumerate()
+                .map(|(i, _)| i)
+                .collect::<Vec<_>>();
+
+            let core_type_name = type_to_string(core_field_type);
+
+            quote! {
+                #[derive(Debug, Clone, Default)]
+                pub struct #flattened_name {
+                    #(pub #core_field_idents: #core_field_types,)*
+                    #(pub #other_field_idents: #other_field_types,)*
+                }
+
+                impl #name {
+                    /// build a object of the struct from a row of database
+                    pub fn from_row(row: Vec<DbValue>) -> #name {
+                        let mut flattened = #flattened_name::default();
+                        #(
+                            flattened.#all_field_idents = #all_field_types::decode(&row[#orders]).unwrap();
+                        )*
+                        println!("flattened: {:?}", flattened);
+                        let mut core_instance = #core_field_type::default();
+                        // build a core model instance
+                        #(
+                            core_instance.#core_field_idents = flattened.#core_field_idents;
+                        )*
+                        println!("core_instance: {:?}", core_instance);
+                        // build a dto instance and return it
+                        #name {
+                            #core_field_name: core_instance,
+                            #(#other_field_idents: flattened.#other_field_idents,)*
+                        }
+                    }
+                }
+
+                impl EightFishModel for #name {
+                    /// get the model name of the core type
+                    fn model_name(&self) -> String {
+                        #core_type_name.to_string().to_lowercase()
+                    }
+                    /// get the id of the model object
+                    fn id(&self) -> String {
+                        self.#core_field_name.id()
+                    }
+                    /// calculate the hash of the model object
+                    /// calculate the hash of the dto object
+                    fn calc_hash(&self) -> String {
+                        // dto's hash is the core's hash
+                        self.#core_field_name.calc_hash()
+                    }
+                }
+
+                // impl From<#core_field_type> for #flattened_name {
+                //     fn from(core: #core_field_type) -> Self {
+                //         Self {
+                //             #(#core_field_idents: core.#core_field_idents,)*
+                //             #(#other_field_idents: Default::default(),)*
+                //         }
+                //     }
+                // }
+            }
+        }
+        _ => panic!("EightFishDTO only supports structs"),
+    };
+
+    TokenStream::from(expanded)
+}
+
+fn type_to_string(ty: &Type) -> String {
+    match ty {
+        Type::Path(type_path) => {
+            // Extract the path segments and join them (e.g., `std::vec::Vec` -> "Vec")
+            type_path
+                .path
+                .segments
+                .iter()
+                .map(|segment| segment.ident.to_string())
+                .collect::<Vec<_>>()
+                .join("::")
+        }
+        _ => "Unknown".to_string(), // Handle other types (e.g., references, tuples)
+    }
 }

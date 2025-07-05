@@ -58,6 +58,22 @@ impl EightFishRouter {
         self.route(Method::Post, glob, handler)
     }
 
+    pub fn put<H: EightFishHandler + 'static>(
+        &mut self,
+        glob: &'static str,
+        handler: H,
+    ) -> &mut EightFishRouter {
+        self.route(Method::Put, glob, handler)
+    }
+
+    pub fn delete<H: EightFishHandler + 'static>(
+        &mut self,
+        glob: &'static str,
+        handler: H,
+    ) -> &mut EightFishRouter {
+        self.route(Method::Delete, glob, handler)
+    }
+
     pub fn into_router(&self) -> &InnerRouter {
         &self.router
     }

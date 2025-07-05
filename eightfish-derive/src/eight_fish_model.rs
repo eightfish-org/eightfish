@@ -9,10 +9,6 @@
 //!ParameterValue::Int16(v)
 //!ParameterValue::Floating32(v)
 //!ParameterValue::Floating64(v)
-//!ParameterValue::Uint8(v)
-//!ParameterValue::Uint16(v)
-//!ParameterValue::Uint32(v)
-//!ParameterValue::Uint64(v)
 //!ParameterValue::Str(v)
 //!ParameterValue::Binary(v)
 //!ParameterValue::DbNull
@@ -90,6 +86,20 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
         }
     });
     let update_params = create_params.clone();
+
+    // Generate a method for each field
+    let methods = fields.iter().map(|field| {
+        let field_name = field.ident.as_ref().unwrap();
+        let method_name = syn::Ident::new(&format!("{}", field_name), field_name.span());
+        let field_name_str = field_name.to_string();
+
+        quote! {
+            pub fn #method_name() -> &'static str {
+                #field_name_str
+            }
+        }
+    });
+
     let output = quote! {
         impl #ident {
             /// get the table name of the model
@@ -140,7 +150,8 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
                 sql_builder::SqlBuilder::insert_into(Self::model_name())
                     .fields(&Self::fields())
                     .values(&[Self::row_placeholders()])
-                    .sql().unwrap()
+                    .returning("*")
+                    .sql().unwrap_or("".to_string())
             }
             /// build the parameters for the sql statement to insert the record
             pub fn params_insert(&self) -> Vec<ParameterValue> {
@@ -157,7 +168,7 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
 
             /// build the sql to update the record
             pub fn sql_update() -> String {
-                format!("UPDATE {} SET {} WHERE id = $1;", Self::model_name(), Self::update_placeholders())
+                format!("UPDATE {} SET {} WHERE id = $1 RETURNING *;", Self::model_name(), Self::update_placeholders())
             }
             /// build the parameters for the sql statement to update the record
             pub fn params_update(&self) -> Vec<ParameterValue> {
@@ -174,7 +185,7 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
 
             /// build the sql to delete the record
             pub fn sql_delete() -> String {
-                format!("DELETE FROM {} WHERE id = $1;", Self::model_name())
+                format!("DELETE FROM {} WHERE id = $1 RETURNING *;", Self::model_name())
             }
             /// build the parameters for the sql statement to delete the record
             pub fn params_delete(id: &str) -> Vec<ParameterValue> {
@@ -183,11 +194,22 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
                 param_vec
             }
             /// build both the sql statement and parameters to delete a record with given id
-            pub fn build_delete(id: &str) -> (String, Vec<ParameterValue>) {
+            pub fn build_delete(&self) -> (String, Vec<ParameterValue>) {
+                let id = &self.id();
                 (Self::sql_delete(), Self::params_delete(id))
             }
         }
+
+        // implement name_of_{field_name} serial methods for this struct
+        impl #ident {
+            #(#methods)*
+        }
+
         impl EightFishModel for #ident {
+            /// get the model name of the type
+            fn model_name(&self) -> String {
+                Self::model_name()
+            }
             /// get the id of the model object
             fn id(&self) -> String {
                 self.id.clone()

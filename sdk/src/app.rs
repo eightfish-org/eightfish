@@ -169,13 +169,3 @@ impl EightFishHandler for EightFishApp {
         */
     }
 }
-
-#[derive(Debug, Default)]
-pub enum EightFishHandlerCRUD {
-    #[default]
-    GetOne,
-    List,
-    Create,
-    Update,
-    Delete,
-}
