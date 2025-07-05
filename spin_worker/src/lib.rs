@@ -312,25 +312,11 @@ impl Worker {
                 let redis_conn = redis::Connection::open(&redis_addr)
                     .expect("error when open redis connection.");
 
-                // for any write action, we seem them the same, and
-                // decrease the stack count on each event of them arrives
-                let key0 = CACHE_STACKCOUNT.replace("#", &reqid);
-                let param1 = RedisParameter::Binary(key0.as_bytes().to_vec());
-                let avec: Vec<i64> = redis_conn
-                    .execute("decr", &[param1])?
-                    .into_iter()
-                    .map(|res| match res {
-                        RedisResult::Int64(result) => result,
-                        _ => -1,
-                    })
-                    .collect();
-                println!("callback: update_index: decr count: {:?}", avec);
-                if !avec.is_empty() {
-                    let result = avec[0];
-                    // when the stack count reaches 0, it says all indexes have been
-                    // updated to the vintage
-                    if result == 0 {
+                if let Ok(n) = decr_stackcount(&redis_conn, &reqid) {
+                    if n == 0 {
+                        // for new_check
                         // for write case, we also need to check pair list for result
+                        let key0 = CACHE_STACKCOUNT.replace("#", &reqid);
                         let key1 = CACHE_PAIRLIST.replace('#', &reqid);
                         if let Some(avec) = redis_conn.get(&key1)? {
                             let pair_list: Vec<(String, String)> = serde_json::from_slice(&avec)?;
@@ -343,13 +329,17 @@ impl Worker {
                                     &pair_list,
                                 );
                             }
+                        } else {
+                            // for new_uncheck, let it go at here
+                            let status_code = StatusCode::OK.as_u16().to_string();
+                            set_cache_status_code(&redis_conn, &reqid, &status_code);
                         }
+
                         // clear the stack count key
                         _ = redis_conn.del(&[key0, key1]);
                     }
                 } else {
-                    // do nothing
-                    _ = redis_conn.del(&[key0]);
+                    // nothing
                 }
 
                 // TODO: we need handle the error case when vintage throws erros
@@ -377,7 +367,7 @@ impl Worker {
                 } else {
                     let data = "Checking pair list failed, abort the response!";
                     set_cache_result(&redis_conn, &reqid, None, data);
-                    let status_code = StatusCode::INTERNAL_SERVER_ERROR.as_u16();
+                    let status_code = StatusCode::UNPROCESSABLE_ENTITY.as_u16();
                     set_cache_status_code(&redis_conn, &reqid, &status_code.to_string());
                 }
             }
@@ -387,6 +377,43 @@ impl Worker {
         }
 
         Ok(())
+    }
+}
+
+fn check_stackcount(redis_conn: &redis::Connection, reqid: &str) -> Result<i64> {
+    let key0 = CACHE_STACKCOUNT.replace("#", &reqid);
+    if let Some(payload) = redis_conn.get(&key0)? {
+        let value = i64::from_le_bytes(
+            payload
+                .try_into()
+                .map_err(|_| anyhow::anyhow!("Invalid payload"))?,
+        );
+
+        Ok(value)
+    } else {
+        Ok(0)
+    }
+}
+
+fn decr_stackcount(redis_conn: &redis::Connection, reqid: &str) -> Result<i64> {
+    // for any write action, we seem them the same, and
+    // decrease the stack count on each event of them arrives
+    let key0 = CACHE_STACKCOUNT.replace("#", &reqid);
+    let param1 = RedisParameter::Binary(key0.as_bytes().to_vec());
+    let avec: Vec<i64> = redis_conn
+        .execute("decr", &[param1])?
+        .into_iter()
+        .map(|res| match res {
+            RedisResult::Int64(result) => result,
+            _ => -1,
+        })
+        .collect();
+
+    println!("decr stackcount: {:?}", avec);
+    if !avec.is_empty() {
+        Ok(avec[0])
+    } else {
+        Ok(-1)
     }
 }
 
@@ -407,14 +434,20 @@ fn store_result_to_cache(redis_conn: &redis::Connection, reqid: &str, res: &Eigh
             set_cache_status_code(&redis_conn, &reqid, &status_code);
         }
     } else {
-        // for the custom result, return it immediately
         if let &Some(ref astr) = res.custom_result() {
             // return customized string body
+            // for this case, we need yet to wait the STACKCOUNTER decreased to 0
             let data_to_cache = astr;
             set_cache_result(redis_conn, reqid, headers, data_to_cache);
-            let status_code = StatusCode::OK.as_u16().to_string();
-            set_cache_status_code(&redis_conn, &reqid, &status_code);
+            if let Ok(0) = check_stackcount(redis_conn, reqid) {
+                let status_code = StatusCode::OK.as_u16().to_string();
+                set_cache_status_code(&redis_conn, &reqid, &status_code);
+                // clear the stackcount key
+                // let key0 = CACHE_STACKCOUNT.replace("#", &reqid);
+                // _ = redis_conn.del(&[key0]);
+            }
         } else {
+            // for the no content result, return it immediately
             let data_to_cache = "<no content>";
             set_cache_result(redis_conn, reqid, headers, data_to_cache);
             let status_code = StatusCode::OK.as_u16().to_string();
@@ -551,11 +584,11 @@ pub fn update_index_on_write(
 
 #[allow(dead_code)]
 pub fn append_returning_star(sql: &str) -> String {
-    let trimmed = sql.trim();
+    let trimmed = sql.trim().trim_end_matches(";");
     if trimmed.to_uppercase().ends_with("RETURNING *") {
-        trimmed.to_string()
+        format!("{};", trimmed)
     } else {
-        format!("{} RETURNING *", trimmed)
+        format!("{} RETURNING *;", trimmed)
     }
 }
 
@@ -603,7 +636,7 @@ macro_rules! sql_update_one {
     ($req:expr, $instance:expr) => {{
         use spin_sdk::{pg, redis};
 
-        let pg_addr = std::env::var(DB_URL).expect("ENV DB_URLnot set.");
+        let pg_addr = std::env::var(DB_URL).expect("ENV DB_URL not set.");
         let pg_conn = pg::Connection::open(&pg_addr).expect("error when open pg connection.");
 
         let (sql_statement, sql_params) = $instance.build_update();
@@ -652,6 +685,7 @@ macro_rules! sql_update {
 
         let sql_str = spin_worker::append_returning_star($sql_statement);
         println!("in sql_update, sql str: {}", sql_str);
+        println!("in sql_update, sql str: {:?}", $sql_params);
 
         let res = pg_conn.query(&sql_str, $sql_params);
         match res {
@@ -826,9 +860,11 @@ macro_rules! sql_query {
         let pg_conn = pg::Connection::open(&pg_addr).expect("error when open pg connection.");
 
         let rowset = pg_conn.query($sql_statement, $sql_params)?;
+        // println!("{:?}", rowset);
 
         let mut instances = vec![];
         for row in rowset.rows.into_iter() {
+            // println!("{:?}", row);
             let instance = <$model>::from_row(row);
             instances.push(instance);
         }
