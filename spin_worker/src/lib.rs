@@ -601,6 +601,9 @@ macro_rules! sql_create_one {
         let pg_conn = pg::Connection::open(&pg_addr).expect("error when open pg connection.");
 
         let (sql_statement, sql_params) = $instance.build_insert();
+        println!("sql str: {}", sql_statement);
+        println!("sql params: {:?}", sql_params);
+
         let res = pg_conn.query(&sql_statement, &sql_params);
         match res {
             Ok(_) => {
@@ -685,7 +688,7 @@ macro_rules! sql_update {
 
         let sql_str = spin_worker::append_returning_star($sql_statement);
         println!("in sql_update, sql str: {}", sql_str);
-        println!("in sql_update, sql str: {:?}", $sql_params);
+        println!("in sql_update, sql params: {:?}", $sql_params);
 
         let res = pg_conn.query(&sql_str, $sql_params);
         match res {
@@ -741,6 +744,9 @@ macro_rules! sql_delete_one {
         let pg_conn = pg::Connection::open(&pg_addr).expect("error when open pg connection.");
 
         let (sql_statement, sql_params) = $instance.build_delete();
+        println!("sql str: {}", sql_statement);
+        println!("sql params: {:?}", sql_params);
+
         let res = pg_conn.query(&sql_statement, &sql_params);
         match res {
             Ok(_) => {
@@ -781,6 +787,7 @@ macro_rules! sql_delete {
 
         let sql_str = spin_worker::append_returning_star($sql_statement);
         println!("in sql_delete, sql str: {}", sql_str);
+        println!("in sql_delete, sql str: {:?}", $sql_params);
 
         let res = pg_conn.query(&sql_str, $sql_params);
         match res {
@@ -838,6 +845,9 @@ macro_rules! sql_query_one {
         let pg_conn = pg::Connection::open(&pg_addr).expect("error when open pg connection.");
 
         let (sql, sql_params) = <$model>::build_get_by_id($id);
+        println!("sql str: {}", sql);
+        println!("sql params: {:?}", sql_params);
+
         let rowset = pg_conn.query(&sql, &sql_params)?;
 
         if let Some(row) = rowset.rows.into_iter().next() {
@@ -859,12 +869,12 @@ macro_rules! sql_query {
         let pg_addr = std::env::var(DB_URL).expect("ENV DB_URL not set.");
         let pg_conn = pg::Connection::open(&pg_addr).expect("error when open pg connection.");
 
+        println!("{:?}", $sql_statement);
+        println!("{:?}", $sql_params);
         let rowset = pg_conn.query($sql_statement, $sql_params)?;
-        // println!("{:?}", rowset);
 
         let mut instances = vec![];
         for row in rowset.rows.into_iter() {
-            // println!("{:?}", row);
             let instance = <$model>::from_row(row);
             instances.push(instance);
         }
