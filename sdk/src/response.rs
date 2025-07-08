@@ -80,10 +80,27 @@ impl EightFishResponse {
 
     pub fn from_str_uncheck(status: StatusCode, custom_result: String) -> Self {
         let mut headers = HeaderMap::new();
-        let json_header = "text/plain"
+        let header = "text/plain"
             .parse()
             .expect("str parsing error in Response from_failed.");
-        headers.insert(http::header::CONTENT_TYPE, json_header);
+        headers.insert(http::header::CONTENT_TYPE, header);
+
+        EightFishResponse {
+            status,
+            headers: Some(headers),
+            result: None,
+            custom_result: Some(custom_result),
+            model_name: None,
+            pair_list: None,
+        }
+    }
+
+    pub fn from_html_uncheck(status: StatusCode, custom_result: String) -> Self {
+        let mut headers = HeaderMap::new();
+        let header = "text/html"
+            .parse()
+            .expect("str parsing error in Response from_failed.");
+        headers.insert(http::header::CONTENT_TYPE, header);
 
         EightFishResponse {
             status,
