@@ -283,6 +283,14 @@ struct Inner0 {
     b: String,
 }
 
+#[derive(Default, EightFishModel, PartialEq, Debug, Serialize, Deserialize)]
+struct FooWithOptions {
+    id: String,
+    title: Option<String>,
+    count: Option<i64>,
+    active: Option<bool>,
+}
+
 #[derive(EightFishDTO, Debug, Serialize, Deserialize)]
 struct DTO00 {
     #[dtocore]
@@ -309,4 +317,58 @@ fn test_ef_dto_2() {
     assert_eq!(dto.id(), "xxuuid");
     assert_eq!(dto.inner.id(), "xxuuid");
     assert_eq!(dto.calc_hash(), dto.inner.calc_hash());
+}
+
+#[test]
+fn test_option_fields_with_values() {
+    let f = FooWithOptions {
+        id: "test_id".to_string(),
+        title: Some("test_title".to_string()),
+        count: Some(42),
+        active: Some(true),
+    };
+    
+    let params = f.params_insert();
+    assert_eq!(params.len(), 4);
+    
+    assert!(matches!(&params[0], ParameterValue::Str(s) if s == "test_id"));
+    assert!(matches!(&params[1], ParameterValue::Str(s) if s == "test_title"));
+    assert!(matches!(&params[2], ParameterValue::Int64(42)));
+    assert!(matches!(&params[3], ParameterValue::Boolean(true)));
+}
+
+#[test]
+fn test_option_fields_with_none_values() {
+    let f = FooWithOptions {
+        id: "test_id".to_string(),
+        title: None,
+        count: None,
+        active: None,
+    };
+    
+    let params = f.params_insert();
+    assert_eq!(params.len(), 4);
+    
+    assert!(matches!(&params[0], ParameterValue::Str(s) if s == "test_id"));
+    assert!(matches!(&params[1], ParameterValue::DbNull));
+    assert!(matches!(&params[2], ParameterValue::DbNull));
+    assert!(matches!(&params[3], ParameterValue::DbNull));
+}
+
+#[test]
+fn test_option_fields_mixed_values() {
+    let f = FooWithOptions {
+        id: "test_id".to_string(),
+        title: Some("test_title".to_string()),
+        count: None,
+        active: Some(false),
+    };
+    
+    let params = f.params_insert();
+    assert_eq!(params.len(), 4);
+    
+    assert!(matches!(&params[0], ParameterValue::Str(s) if s == "test_id"));
+    assert!(matches!(&params[1], ParameterValue::Str(s) if s == "test_title"));
+    assert!(matches!(&params[2], ParameterValue::DbNull));
+    assert!(matches!(&params[3], ParameterValue::Boolean(false)));
 }

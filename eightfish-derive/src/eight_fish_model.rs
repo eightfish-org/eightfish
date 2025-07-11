@@ -15,7 +15,10 @@
 //!
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use syn::{Data, DataStruct, DeriveInput, Fields, Type};
+use syn::{
+    AngleBracketedGenericArguments, Data, DataStruct, DeriveInput, Fields, GenericArgument,
+    PathArguments, Type, TypePath,
+};
 
 pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
     let DeriveInput { ident, data, .. } = input;
@@ -46,7 +49,33 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
         .collect::<Vec<String>>()
         .join(", ");
 
-    let types = fields.iter().map(|f| &f.ty);
+    fn is_option_type(type_path: &TypePath) -> bool {
+        type_path.path.segments.len() == 1 && type_path.path.segments[0].ident == "Option"
+    }
+
+    fn extract_option_inner_type(type_path: &TypePath) -> &Type {
+        if let PathArguments::AngleBracketed(AngleBracketedGenericArguments { args, .. }) =
+            &type_path.path.segments[0].arguments
+        {
+            if let Some(GenericArgument::Type(inner_type)) = args.first() {
+                return inner_type;
+            }
+        }
+        panic!("Expected Option<T> with generic argument");
+    }
+
+    // let types = fields.iter().map(|f| &f.ty);
+    let types = fields.iter().map(|f| {
+        let ty = &f.ty;
+        match ty {
+            Type::Path(type_path) if is_option_type(type_path) => {
+                let inner = extract_option_inner_type(type_path);
+                quote! { Option::<#inner> }
+            }
+            _ => quote! { #ty },
+        }
+    });
+
     let field_identifiers_2 = field_identifiers.clone();
     let orders = fields.iter().enumerate().map(|(i, _)| i);
     let ident_string = ident.to_string();
@@ -80,6 +109,56 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
             {
                 quote! {
                     param_vec.push(ParameterValue::Boolean(self.#field_name));
+                }
+            }
+            Type::Path(type_path)
+                if type_path
+                    .clone()
+                    .into_token_stream()
+                    .to_string()
+                    .contains("Option") =>
+            {
+                let type_string = type_path.clone().into_token_stream().to_string();
+                // println!("Option type detected: {}", type_string);
+                if type_string.contains("Option") && type_string.contains("String") {
+                    quote! {
+                        match &self.#field_name {
+                            Some(val) => param_vec.push(ParameterValue::Str(val.clone())),
+                            None => param_vec.push(ParameterValue::DbNull),
+                        }
+                    }
+                } else if type_string.contains("Option") && type_string.contains("i64") {
+                    quote! {
+                        match &self.#field_name {
+                            Some(val) => param_vec.push(ParameterValue::Int64(*val)),
+                            None => param_vec.push(ParameterValue::DbNull),
+                        }
+                    }
+                } else if type_string.contains("Option") && type_string.contains("i32") {
+                    quote! {
+                        match &self.#field_name {
+                            Some(val) => param_vec.push(ParameterValue::Int32(*val)),
+                            None => param_vec.push(ParameterValue::DbNull),
+                        }
+                    }
+                } else if type_string.contains("Option") && type_string.contains("i16") {
+                    quote! {
+                        match &self.#field_name {
+                            Some(val) => param_vec.push(ParameterValue::Int16(*val)),
+                            None => param_vec.push(ParameterValue::DbNull),
+                        }
+                    }
+                } else if type_string.contains("Option") && type_string.contains("bool") {
+                    quote! {
+                        match &self.#field_name {
+                            Some(val) => param_vec.push(ParameterValue::Boolean(*val)),
+                            None => param_vec.push(ParameterValue::DbNull),
+                        }
+                    }
+                } else {
+                    quote! {
+                        param_vec.push(ParameterValue::DbNull);
+                    }
                 }
             }
             _ => unimplemented!(),
