@@ -30,10 +30,34 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
         _ => panic!("This derive macro only works on structs with named fields"),
     };
 
+    let ident_str = ident.to_string().to_lowercase();
+
     let field_identifiers = fields.iter().map(|f| &f.ident);
-    let field_identifiers_for_names = field_identifiers.clone();
-    let field_names = format!("{}", quote! {#(#field_identifiers_for_names),*});
+    // let field_identifiers_for_names = field_identifiers.clone();
     // let field_names = quote! {#(#field_identifiers_for_names),*};
+    // let field_names = format!(
+    //     "{}",
+    //     quote! {
+    //         #(#field_identifiers_for_names),*
+    //     }
+    // );
+    let _field_names = fields.iter().map(|field| {
+        let field_name = field.ident.as_ref().unwrap();
+        let field_name_str = field_name.to_string();
+
+        // quote! {
+        // concat!(#ident_str, ".", #field_name_str)
+        // }
+        let full_field_name = format!("{}.{}", ident_str, field_name_str);
+
+        full_field_name
+    });
+    let field_names = format!(
+        "{}",
+        quote! {
+            #(#_field_names),*
+        }
+    );
 
     let field_placeholders = fields
         .iter()
@@ -65,16 +89,19 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
     }
 
     // let types = fields.iter().map(|f| &f.ty);
-    let types = fields.iter().map(|f| {
-        let ty = &f.ty;
-        match ty {
-            Type::Path(type_path) if is_option_type(type_path) => {
-                let inner = extract_option_inner_type(type_path);
-                quote! { Option::<#inner> }
+    let types: Vec<_> = fields
+        .iter()
+        .map(|f| {
+            let ty = &f.ty;
+            match ty {
+                Type::Path(type_path) if is_option_type(type_path) => {
+                    let inner = extract_option_inner_type(type_path);
+                    quote! { Option::<#inner> }
+                }
+                _ => quote! { #ty },
             }
-            _ => quote! { #ty },
-        }
-    });
+        })
+        .collect();
 
     let field_identifiers_2 = field_identifiers.clone();
     let orders = fields.iter().enumerate().map(|(i, _)| i);
@@ -171,10 +198,11 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
         let field_name = field.ident.as_ref().unwrap();
         let method_name = syn::Ident::new(&format!("{}", field_name), field_name.span());
         let field_name_str = field_name.to_string();
+        let ident_str = ident.to_string().to_lowercase();
 
         quote! {
             pub fn #method_name() -> &'static str {
-                #field_name_str
+                 concat!(#ident_str, ".", #field_name_str)
             }
         }
     });
@@ -187,8 +215,9 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
             }
             /// get the field names of the model, separated by commas
             pub fn fields() -> Vec<String> {
-                let astr = format!("{}", #field_names);
-                astr.replace(" ", "").split(",").map(|x|x.to_owned()).collect()
+                // let astr = format!("{}", #field_names);
+                let astr = #field_names;
+                astr.replace(" ", "").replace("\"", "").split(",").map(|x|x.to_owned()).collect()
             }
             /// get the update placeholders of the model, in format of "field1 = $1, field2 = $2"
             pub fn update_placeholders() -> String {

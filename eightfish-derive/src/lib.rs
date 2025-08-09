@@ -10,8 +10,13 @@ use quote::{format_ident, quote};
 use syn::{
     parse_macro_input,
     visit::{self, Visit},
-    Data, DeriveInput, Field, Fields, File, Type,
+    AngleBracketedGenericArguments, Data, DeriveInput, Field, Fields, File, GenericArgument,
+    PathArguments, Type, TypePath,
 };
+// use syn::{
+//     AngleBracketedGenericArguments, Data, DataStruct, DeriveInput, Fields, GenericArgument,
+//     PathArguments, Type, TypePath,
+// };
 
 /// Provide method to build simple sql, also used to generate blockchain related data for a EF application entity.
 ///
@@ -148,12 +153,54 @@ pub fn eight_fish_dto_derive(input: TokenStream) -> TokenStream {
             // Generate new struct name
             let flattened_name = format_ident!("{}Flattened", name);
 
+            fn is_option_type(type_path: &TypePath) -> bool {
+                type_path.path.segments.len() == 1 && type_path.path.segments[0].ident == "Option"
+            }
+
+            fn extract_option_inner_type(type_path: &TypePath) -> &Type {
+                if let PathArguments::AngleBracketed(AngleBracketedGenericArguments {
+                    args, ..
+                }) = &type_path.path.segments[0].arguments
+                {
+                    if let Some(GenericArgument::Type(inner_type)) = args.first() {
+                        return inner_type;
+                    }
+                }
+                panic!("Expected Option<T> with generic argument");
+            }
+
             // Generate fields for the flattened struct
             let core_field_idents: Vec<_> = core_type_fields.iter().map(|f| &f.ident).collect();
-            let core_field_types: Vec<_> = core_type_fields.iter().map(|f| &f.ty).collect();
+            // let core_field_types: Vec<_> = core_type_fields.iter().map(|f| &f.ty).collect();
+            let core_field_types: Vec<_> = core_type_fields
+                .iter()
+                .map(|f| {
+                    let ty = &f.ty;
+                    match ty {
+                        Type::Path(type_path) if is_option_type(type_path) => {
+                            let inner = extract_option_inner_type(type_path);
+                            quote! { Option::<#inner> }
+                        }
+                        _ => quote! { #ty },
+                    }
+                })
+                .collect();
 
             let other_field_idents: Vec<_> = other_fields.iter().map(|f| &f.ident).collect();
-            let other_field_types: Vec<_> = other_fields.iter().map(|f| &f.ty).collect();
+            // let other_field_types: Vec<_> = other_fields.iter().map(|f| &f.ty).collect();
+            let other_field_types: Vec<_> = other_fields
+                .iter()
+                .map(|f| {
+                    let ty = &f.ty;
+                    match ty {
+                        Type::Path(type_path) if is_option_type(type_path) => {
+                            let inner = extract_option_inner_type(type_path);
+                            quote! { Option::<#inner> }
+                        }
+                        _ => quote! { #ty },
+                    }
+                })
+                .collect();
 
             let all_field_idents =
                 vec![core_field_idents.clone(), other_field_idents.clone()].concat();

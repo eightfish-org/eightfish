@@ -25,13 +25,17 @@ fn test_model_names() {
 
 #[test]
 fn test_struct_names() {
-    let vec = vec!["id".to_string(), "title".to_string(), "content".to_string()];
+    let vec = vec![
+        "foo.id".to_string(),
+        "foo.title".to_string(),
+        "foo.content".to_string(),
+    ];
     assert_eq!(vec, Foo::fields());
 }
 #[test]
 fn test_get_one_sql() {
     assert_eq!(
-        "SELECT id, title, content FROM foo WHERE id = $1;",
+        "SELECT foo.id, foo.title, foo.content FROM foo WHERE id = $1;",
         Foo::sql_get_by_id()
     );
 }
@@ -39,7 +43,7 @@ fn test_get_one_sql() {
 #[test]
 fn test_insert_sql() {
     assert_eq!(
-        "INSERT INTO foo (id, title, content) VALUES ($1, $2, $3) RETURNING *;",
+        "INSERT INTO foo (foo.id, foo.title, foo.content) VALUES ($1, $2, $3) RETURNING *;",
         Foo::sql_insert()
     );
 }
@@ -126,7 +130,7 @@ fn test_build_insert_sql_and_params() {
     };
     let (statement, params) = f.build_insert();
     assert_eq!(
-        "INSERT INTO foo (id, title, content) VALUES ($1, $2, $3) RETURNING *;",
+        "INSERT INTO foo (foo.id, foo.title, foo.content) VALUES ($1, $2, $3) RETURNING *;",
         statement
     );
     assert!(matches!(&params[0], ParameterValue::Str(_id)));
@@ -161,7 +165,7 @@ fn test_build_get_one_sql_and_params() {
     let (statement, params) = Foo::build_get_by_id(id);
 
     assert_eq!(
-        "SELECT id, title, content FROM foo WHERE id = $1;",
+        "SELECT foo.id, foo.title, foo.content FROM foo WHERE id = $1;",
         statement
     );
     assert!(matches!(&params[0], ParameterValue::Str(_id)));
@@ -327,10 +331,10 @@ fn test_option_fields_with_values() {
         count: Some(42),
         active: Some(true),
     };
-    
+
     let params = f.params_insert();
     assert_eq!(params.len(), 4);
-    
+
     assert!(matches!(&params[0], ParameterValue::Str(s) if s == "test_id"));
     assert!(matches!(&params[1], ParameterValue::Str(s) if s == "test_title"));
     assert!(matches!(&params[2], ParameterValue::Int64(42)));
@@ -345,10 +349,10 @@ fn test_option_fields_with_none_values() {
         count: None,
         active: None,
     };
-    
+
     let params = f.params_insert();
     assert_eq!(params.len(), 4);
-    
+
     assert!(matches!(&params[0], ParameterValue::Str(s) if s == "test_id"));
     assert!(matches!(&params[1], ParameterValue::DbNull));
     assert!(matches!(&params[2], ParameterValue::DbNull));
@@ -363,10 +367,10 @@ fn test_option_fields_mixed_values() {
         count: None,
         active: Some(false),
     };
-    
+
     let params = f.params_insert();
     assert_eq!(params.len(), 4);
-    
+
     assert!(matches!(&params[0], ParameterValue::Str(s) if s == "test_id"));
     assert!(matches!(&params[1], ParameterValue::Str(s) if s == "test_title"));
     assert!(matches!(&params[2], ParameterValue::DbNull));
