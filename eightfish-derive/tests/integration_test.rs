@@ -43,7 +43,7 @@ fn test_get_one_sql() {
 #[test]
 fn test_insert_sql() {
     assert_eq!(
-        "INSERT INTO foo (foo.id, foo.title, foo.content) VALUES ($1, $2, $3) RETURNING *;",
+        "INSERT INTO foo (id, title, content) VALUES ($1, $2, $3) RETURNING *;",
         Foo::sql_insert()
     );
 }
@@ -130,7 +130,7 @@ fn test_build_insert_sql_and_params() {
     };
     let (statement, params) = f.build_insert();
     assert_eq!(
-        "INSERT INTO foo (foo.id, foo.title, foo.content) VALUES ($1, $2, $3) RETURNING *;",
+        "INSERT INTO foo (id, title, content) VALUES ($1, $2, $3) RETURNING *;",
         statement
     );
     assert!(matches!(&params[0], ParameterValue::Str(_id)));

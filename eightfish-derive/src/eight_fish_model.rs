@@ -33,15 +33,15 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
     let ident_str = ident.to_string().to_lowercase();
 
     let field_identifiers = fields.iter().map(|f| &f.ident);
-    // let field_identifiers_for_names = field_identifiers.clone();
+    let field_identifiers_for_names = field_identifiers.clone();
     // let field_names = quote! {#(#field_identifiers_for_names),*};
-    // let field_names = format!(
-    //     "{}",
-    //     quote! {
-    //         #(#field_identifiers_for_names),*
-    //     }
-    // );
-    let _field_names = fields.iter().map(|field| {
+    let field_names = format!(
+        "{}",
+        quote! {
+            #(#field_identifiers_for_names),*
+        }
+    );
+    let _full_field_names = fields.iter().map(|field| {
         let field_name = field.ident.as_ref().unwrap();
         let field_name_str = field_name.to_string();
 
@@ -52,10 +52,10 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
 
         full_field_name
     });
-    let field_names = format!(
+    let full_field_names = format!(
         "{}",
         quote! {
-            #(#_field_names),*
+            #(#_full_field_names),*
         }
     );
 
@@ -213,9 +213,12 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
             pub fn model_name() -> String {
                 #ident_string.to_string().to_lowercase()
             }
-            /// get the field names of the model, separated by commas
+            /// get the full field names of the model, separated by commas
             pub fn fields() -> Vec<String> {
-                // let astr = format!("{}", #field_names);
+                let astr = #full_field_names;
+                astr.replace(" ", "").replace("\"", "").split(",").map(|x|x.to_owned()).collect()
+            }
+            pub fn __fields() -> Vec<String> {
                 let astr = #field_names;
                 astr.replace(" ", "").replace("\"", "").split(",").map(|x|x.to_owned()).collect()
             }
@@ -256,7 +259,7 @@ pub fn expand_eight_fish_model(input: DeriveInput) -> TokenStream {
             /// build the sql insert the record
             pub fn sql_insert() -> String {
                 sql_builder::SqlBuilder::insert_into(Self::model_name())
-                    .fields(&Self::fields())
+                    .fields(&Self::__fields())
                     .values(&[Self::row_placeholders()])
                     .returning("*")
                     .sql().unwrap_or("".to_string())
