@@ -795,6 +795,7 @@ macro_rules! sql_delete {
                 let mut instances = vec![];
                 for row in rowset.rows {
                     let instance = <$model>::from_row(row);
+                    println!("in sql_delete, instance: {:?}", instance);
                     instances.push(instance);
                 }
 
