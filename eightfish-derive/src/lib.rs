@@ -228,13 +228,14 @@ pub fn eight_fish_dto_derive(input: TokenStream) -> TokenStream {
                         #(
                             flattened.#all_field_idents = #all_field_types::decode(&row[#orders]).unwrap();
                         )*
-                        println!("flattened: {:?}", flattened);
+                        // println!("flattened: {:?}", flattened);
                         let mut core_instance = #core_field_type::default();
+
                         // build a core model instance
                         #(
                             core_instance.#core_field_idents = flattened.#core_field_idents;
                         )*
-                        println!("core_instance: {:?}", core_instance);
+                        // println!("core_instance: {:?}", core_instance);
                         // build a dto instance and return it
                         #name {
                             #core_field_name: core_instance,
